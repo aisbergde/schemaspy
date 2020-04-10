@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlProducerUsingDOM.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.xml.dom</a> &gt; <span class="el_source">XmlProducerUsingDOM.java</span></div><h1>XmlProducerUsingDOM.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 - 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.xml.dom;
+
+import org.schemaspy.model.Database;
+import org.schemaspy.model.Table;
+import org.schemaspy.output.xml.XmlProducer;
+import org.schemaspy.output.xml.XmlProducerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.File;
+import java.io.IOException;
+import java.io.Writer;
+import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Objects;
+
+/**
+ * @author John Currier
+ * @author Wojciech Kasa
+ * @author Nils Petzaell
+ */
+<span class="fc" id="L59">public class XmlProducerUsingDOM implements XmlProducer {</span>
+
+<span class="fc" id="L61">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L63">    private final XmlTableFormatter xmlTableFormatter = new XmlTableFormatter();</span>
+<span class="fc" id="L64">    private final XmlRoutineFormatter xmlRoutineFormatter = new XmlRoutineFormatter();</span>
+<span class="fc" id="L65">    private final XmlSequenceFormatter xmlSequenceFormatter = new XmlSequenceFormatter();</span>
+
+    @Override
+    public void generate(Database database, File outputDir) {
+<span class="fc" id="L69">        Collection&lt;Table&gt; tables = new ArrayList&lt;&gt;(database.getTables());</span>
+<span class="fc" id="L70">        tables.addAll(database.getViews());</span>
+
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (tables.isEmpty()) {</span>
+<span class="fc" id="L73">            LOGGER.info(&quot;No tables to output, nothing written to disk&quot;);</span>
+<span class="fc" id="L74">            return;</span>
+        }
+
+<span class="fc" id="L77">        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();</span>
+        try {
+<span class="fc" id="L79">            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);</span>
+<span class="nc" id="L80">        } catch (ParserConfigurationException e) {</span>
+<span class="nc" id="L81">            LOGGER.warn(&quot;Failed to set secure processing for DocumentBuilderFactory&quot;, e);</span>
+<span class="fc" id="L82">        }</span>
+        DocumentBuilder builder;
+        try {
+<span class="fc" id="L85">            builder = factory.newDocumentBuilder();</span>
+<span class="nc" id="L86">        } catch (ParserConfigurationException exc) {</span>
+<span class="nc" id="L87">            throw new XmlProducerException(&quot;Failed to get a newDocumentBuilder()&quot;,exc);</span>
+<span class="fc" id="L88">        }</span>
+
+<span class="fc" id="L90">        Document document = builder.newDocument();</span>
+<span class="fc" id="L91">        Element rootNode = document.createElement(&quot;database&quot;);</span>
+<span class="fc" id="L92">        document.appendChild(rootNode);</span>
+<span class="fc" id="L93">        DOMUtil.appendAttribute(rootNode, &quot;name&quot;, database.getName());</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (Objects.nonNull(database.getSchema()))</span>
+<span class="fc" id="L95">            DOMUtil.appendAttribute(rootNode, &quot;schema&quot;, database.getSchema().getName());</span>
+<span class="fc" id="L96">        DOMUtil.appendAttribute(rootNode, &quot;type&quot;, database.getDatabaseProduct());</span>
+
+<span class="fc" id="L98">        xmlSequenceFormatter.appendSequences(rootNode, database.getSequences());</span>
+<span class="fc" id="L99">        xmlTableFormatter.appendTables(rootNode, tables);</span>
+<span class="fc" id="L100">        xmlRoutineFormatter.appendRoutines(rootNode, database.getRoutines());</span>
+
+<span class="fc" id="L102">        String xmlName = database.getName();</span>
+
+        // some dbNames have path info in the name...strip it
+<span class="fc" id="L105">        xmlName = new File(xmlName).getName();</span>
+
+        // some dbNames include jdbc driver details including :'s and @'s
+<span class="fc" id="L108">        String[] unusables = xmlName.split(&quot;[:@]&quot;);</span>
+<span class="fc" id="L109">        xmlName = unusables[unusables.length - 1];</span>
+
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (Objects.nonNull(database.getSchema()))</span>
+<span class="fc" id="L112">            xmlName += '.' + database.getSchema().getName();</span>
+
+<span class="fc" id="L114">        document.getDocumentElement().normalize();</span>
+<span class="fc" id="L115">        Path xmlFile = outputDir.toPath().resolve(xmlName + &quot;.xml&quot;);</span>
+<span class="fc" id="L116">        try (Writer writer = Files.newBufferedWriter(xmlFile, StandardCharsets.UTF_8)){</span>
+<span class="fc" id="L117">            write(document, writer);</span>
+<span class="nc" id="L118">        } catch (IOException e) {</span>
+<span class="nc" id="L119">            throw new XmlProducerException(&quot;Unable to write xml to disk&quot;, e);</span>
+<span class="nc" id="L120">        } catch (TransformerException e) {</span>
+<span class="nc" id="L121">            throw new XmlProducerException(&quot;Unable to transform dom document to xml&quot;, e);</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">    }</span>
+
+    private static void write(Document document, Writer writer) throws TransformerException {
+<span class="fc" id="L126">        TransformerFactory transformerFactory = TransformerFactory.newInstance();</span>
+<span class="fc" id="L127">        transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);</span>
+<span class="fc" id="L128">        Transformer transformer = transformerFactory.newTransformer();</span>
+<span class="fc" id="L129">        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, &quot;no&quot;);</span>
+<span class="fc" id="L130">        transformer.setOutputProperty(OutputKeys.METHOD, &quot;xml&quot;);</span>
+<span class="fc" id="L131">        transformer.setOutputProperty(OutputKeys.INDENT, &quot;yes&quot;);</span>
+<span class="fc" id="L132">        transformer.setOutputProperty(OutputKeys.ENCODING, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L133">        transformer.setOutputProperty(&quot;{http://xml.apache.org/xslt}indent-amount&quot;, &quot;3&quot;);</span>
+
+<span class="fc" id="L135">        transformer.transform(new DOMSource(document),</span>
+                new StreamResult(writer));
+<span class="fc" id="L137">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

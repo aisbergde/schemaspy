@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaSpyRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.cli</a> &gt; <span class="el_source">SchemaSpyRunner.java</span></div><h1>SchemaSpyRunner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.cli;
+
+import com.beust.jcommander.ParameterException;
+import org.schemaspy.Config;
+import org.schemaspy.SchemaAnalyzer;
+import org.schemaspy.input.dbms.exceptions.ConnectionFailure;
+import org.schemaspy.model.EmptySchemaException;
+import org.schemaspy.model.InvalidConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ExitCodeGenerator;
+import org.springframework.boot.logging.LogLevel;
+import org.springframework.boot.logging.LoggingSystem;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.sql.SQLException;
+import java.util.Arrays;
+
+@Component
+<span class="fc" id="L41">public class SchemaSpyRunner implements ExitCodeGenerator {</span>
+
+<span class="fc" id="L43">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private static final int EXIT_CODE_OK = 0;
+    private static final int EXIT_CODE_GENERIC_ERROR = 1;
+    private static final int EXIT_CODE_EMPTY_SCHEMA = 2;
+    private static final int EXIT_CODE_CONNECTION_ERROR = 3;
+    private static final int EXIT_CODE_CONFIG_ERROR = 4;
+
+    @Autowired
+    private SchemaAnalyzer analyzer;
+
+    @Autowired
+    private CommandLineArguments arguments;
+
+    @Autowired
+    private CommandLineArgumentParser commandLineArgumentParser;
+
+    @Autowired
+    private LoggingSystem loggingSystem;
+
+<span class="fc" id="L63">    private int exitCode = EXIT_CODE_OK;</span>
+
+    public void run(String... args) {
+        try {
+<span class="fc" id="L67">            commandLineArgumentParser.parse(args);</span>
+<span class="nc" id="L68">        } catch (ParameterException e) {</span>
+<span class="nc" id="L69">            LOGGER.error(e.getLocalizedMessage(),e);</span>
+<span class="nc" id="L70">            exitCode = 1;</span>
+<span class="nc" id="L71">            return;</span>
+<span class="fc" id="L72">        }</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (arguments.isHelpRequired()) {</span>
+<span class="nc" id="L74">            commandLineArgumentParser.printUsage();</span>
+<span class="nc" id="L75">            return;</span>
+        }
+
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (arguments.isDbHelpRequired()) {</span>
+<span class="nc" id="L79">            commandLineArgumentParser.printDatabaseTypesHelp();</span>
+<span class="nc" id="L80">            return;</span>
+        }
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (arguments.isDebug()) {</span>
+<span class="fc" id="L84">            enableDebug();</span>
+        }
+
+<span class="fc" id="L87">        runAnalyzer(args);</span>
+<span class="fc" id="L88">    }</span>
+
+    public void enableDebug() {
+<span class="fc" id="L91">        loggingSystem.setLogLevel(&quot;org.schemaspy&quot;, LogLevel.DEBUG);</span>
+<span class="fc" id="L92">        LOGGER.debug(&quot;Debug enabled&quot;);</span>
+<span class="fc" id="L93">    }</span>
+
+    private void runAnalyzer(String... args) {
+<span class="fc" id="L96">        exitCode = EXIT_CODE_GENERIC_ERROR;</span>
+        try {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            exitCode = analyzer.analyze(new Config(args)) == null ? EXIT_CODE_GENERIC_ERROR : EXIT_CODE_OK;</span>
+<span class="nc" id="L99">        } catch (ConnectionFailure couldntConnect) {</span>
+<span class="nc" id="L100">            LOGGER.warn(&quot;Connection Failure&quot;, couldntConnect);</span>
+<span class="nc" id="L101">            exitCode = EXIT_CODE_CONNECTION_ERROR;</span>
+<span class="nc" id="L102">        } catch (EmptySchemaException noData) {</span>
+<span class="nc" id="L103">            LOGGER.warn(&quot;Empty schema&quot;, noData);</span>
+<span class="nc" id="L104">            exitCode = EXIT_CODE_EMPTY_SCHEMA;</span>
+<span class="fc" id="L105">        } catch (InvalidConfigurationException badConfig) {</span>
+<span class="fc" id="L106">            exitCode = EXIT_CODE_CONFIG_ERROR;</span>
+<span class="fc" id="L107">            LOGGER.debug(&quot;Command line parameters: {}&quot;, Arrays.asList(args));</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (badConfig.getParamName() != null) {</span>
+<span class="fc" id="L109">                LOGGER.error(&quot;Bad parameter: '{} = {}'&quot;, badConfig.getParamName(), badConfig.getParamValue(), badConfig);</span>
+            } else {
+<span class="nc" id="L111">                LOGGER.error(&quot;Bad config&quot;, badConfig);</span>
+            }
+<span class="nc" id="L113">        } catch (SQLException e) {</span>
+<span class="nc" id="L114">            LOGGER.error(&quot;SqlException&quot;, e);</span>
+<span class="nc" id="L115">        } catch (IOException e) {</span>
+<span class="nc" id="L116">            LOGGER.error(&quot;IOException&quot;, e);</span>
+<span class="pc" id="L117">        }</span>
+<span class="fc" id="L118">    }</span>
+
+    @Override
+    public int getExitCode() {
+<span class="nc" id="L122">        return exitCode;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

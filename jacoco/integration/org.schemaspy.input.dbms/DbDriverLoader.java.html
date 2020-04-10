@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DbDriverLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms</a> &gt; <span class="el_source">DbDriverLoader.java</span></div><h1>DbDriverLoader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016, 2017 Rafal Kasa
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.input.dbms;
+
+import org.schemaspy.Config;
+import org.schemaspy.input.dbms.exceptions.ConnectionFailure;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Wojciech Kasa
+ * @author Nils Petzaell
+ * @author Daniel Watt
+ */
+<span class="fc" id="L52">public class DbDriverLoader {</span>
+
+<span class="fc" id="L54">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+<span class="fc" id="L55">    private static Map&lt;String, Driver&gt; driverCache = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L57">    private boolean loadJDBCJars = false;</span>
+
+
+    public Connection getConnection(Config config) throws IOException {
+<span class="fc" id="L61">        Properties properties = config.getDbProperties();</span>
+
+<span class="fc" id="L63">        ConnectionURLBuilder urlBuilder = new ConnectionURLBuilder(config, properties);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (Objects.isNull(config.getDb()))</span>
+<span class="nc" id="L65">            config.setDb(urlBuilder.build());</span>
+
+<span class="fc" id="L67">        String[] driverClass = properties.getProperty(&quot;driver&quot;).split(&quot;,&quot;);</span>
+<span class="fc" id="L68">        String driverPath = properties.getProperty(&quot;driverPath&quot;);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (Objects.isNull(driverPath))</span>
+<span class="nc" id="L70">            driverPath = &quot;&quot;;</span>
+
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (Objects.nonNull(config.getDriverPath()))</span>
+<span class="nc" id="L73">            driverPath = config.getDriverPath();</span>
+
+<span class="fc" id="L75">        return getConnection(config, urlBuilder.build(), driverClass, driverPath);</span>
+    }
+
+    protected Connection getConnection(Config config, String connectionURL,
+                                       String[] driverClasses, String driverPath) throws IOException {
+
+<span class="fc" id="L81">        loadJDBCJars = config.isLoadJDBCJarsEnabled();</span>
+
+<span class="fc" id="L83">        Properties connectionProperties = config.getConnectionProperties();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (config.getUser() != null) {</span>
+<span class="fc" id="L85">            connectionProperties.put(&quot;user&quot;, config.getUser());</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (config.getPassword() != null) {</span>
+<span class="fc" id="L88">            connectionProperties.put(&quot;password&quot;, config.getPassword());</span>
+        }
+
+        Connection connection;
+        try {
+<span class="fc" id="L93">            Driver driver = getDriver(driverClasses, driverPath);</span>
+<span class="fc" id="L94">            connection = driver.connect(connectionURL, connectionProperties);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (connection == null) {</span>
+<span class="nc" id="L96">                throw new ConnectionFailure(&quot;Cannot connect to '&quot; + connectionURL +&quot;' with driver '&quot; + toList(driverClasses) + &quot;'&quot;);</span>
+            }
+<span class="nc" id="L98">        } catch (UnsatisfiedLinkError badPath) {</span>
+<span class="nc" id="L99">            throw new ConnectionFailure(&quot;Error with native library occurred while trying to use driver '&quot;+ toList(driverClasses)+&quot;'&quot;,badPath);</span>
+<span class="nc" id="L100">        } catch (Exception exc) {</span>
+<span class="nc" id="L101">            throw new ConnectionFailure(&quot;Failed to connect to database URL [&quot; + connectionURL + &quot;]&quot;, exc);</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        return connection;</span>
+    }
+
+    private String toList(String[] array) {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (array.length == 1) {</span>
+<span class="nc" id="L108">            return array[0];</span>
+        }
+<span class="nc" id="L110">        return Stream.of(array).collect(Collectors.joining(&quot;,&quot;));</span>
+    }
+
+    /**
+     * Returns an instance of {@link Driver} specified by &lt;code&gt;driverClass&lt;/code&gt;
+     * loaded from &lt;code&gt;driverPath&lt;/code&gt;.
+     *
+     * @param driverClasses
+     * @param driverPath
+     * @return
+     */
+    protected synchronized Driver getDriver(final String []driverClasses, final String driverPath) {
+        Driver driver;
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (String driverClass: driverClasses) {</span>
+<span class="fc" id="L124">            driver = driverCache.get(driverClass + &quot;|&quot; + driverPath);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (Objects.nonNull(driver)) {</span>
+<span class="fc" id="L126">                return driver;</span>
+            }
+        }
+<span class="fc" id="L129">        Set&lt;URI&gt; classpath = getExistingUrls(driverPath);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (classpath.isEmpty()) {</span>
+<span class="fc" id="L131">            URL url = getClass().getResource(driverPath);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (url != null) {</span>
+<span class="nc" id="L133">                classpath = getExistingUrls(url.getPath());</span>
+            }
+        }
+
+        //If this option is true additional jars used by JDBC Driver will be loaded to the classpath
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (loadJDBCJars) {</span>
+<span class="nc" id="L139">            loadAdditionalJarsForDriver(driverPath, classpath);</span>
+        }
+
+
+<span class="fc" id="L143">        ClassLoader loader = getDriverClassLoader(classpath);</span>
+<span class="fc" id="L144">        Class&lt;Driver&gt; driverClass = getDriverClass(driverClasses, loader);</span>
+
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (Objects.isNull(driverClass)) {</span>
+<span class="nc" id="L147">            throw new ConnectionFailure(createMessage(driverClasses, driverPath, classpath));</span>
+        }
+
+        try {
+<span class="fc" id="L151">            driver = driverClass.newInstance();</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (Objects.nonNull(driver)) {</span>
+<span class="fc" id="L153">                driverCache.put(driverClass.getName() + &quot;|&quot; + driverPath, driver);</span>
+            }
+            // have to use deprecated method or we won't see messages generated by older drivers
+            // @see DriverManager.setLogStream(PrintStream)
+            //TODO implement PrintStream to Logger bridge.
+            // setLogStream should only be called once maybe in SpringConfig or Main?
+<span class="nc" id="L159">        } catch (Exception exc) {</span>
+<span class="nc" id="L160">            throw new ConnectionFailure(createMessage(driverClasses, driverPath, classpath), exc);</span>
+<span class="fc" id="L161">        }</span>
+
+<span class="fc" id="L163">        return driver;</span>
+    }
+
+    private Class&lt;Driver&gt; getDriverClass(String[] driverClasses, ClassLoader loader) {
+<span class="fc" id="L167">        Class&lt;Driver&gt; driverClass = null;</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        for(String potentialDriverClass : driverClasses) {</span>
+            try {
+<span class="fc" id="L170">                driverClass = (Class&lt;Driver&gt;) Class.forName(potentialDriverClass, true, loader);</span>
+<span class="nc" id="L171">            } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L172">                LOGGER.debug(&quot;Unable to find driverClass '{}'&quot;, potentialDriverClass);</span>
+<span class="fc" id="L173">            }</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (Objects.nonNull(driverClass)) {</span>
+<span class="fc" id="L175">                return driverClass;</span>
+            }
+        }
+<span class="nc" id="L178">        return null;</span>
+    }
+
+    private String createMessage(String []driverClass, String driverPath, Set&lt;URI&gt; classpath) {
+<span class="nc" id="L182">        StringBuilder sb = new StringBuilder()</span>
+<span class="nc" id="L183">                .append(&quot;Failed to create any of '&quot;)</span>
+<span class="nc" id="L184">                .append(Arrays.stream(driverClass).collect(Collectors.joining(&quot;, &quot;)))</span>
+<span class="nc" id="L185">                .append(&quot;' driver from driverPath '&quot;)</span>
+<span class="nc" id="L186">                .append(driverPath)</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">                .append(&quot;' with sibling jars &quot;)</span>
+<span class="nc" id="L188">                .append((loadJDBCJars ? &quot;yes&quot;: &quot;no&quot;))</span>
+<span class="nc" id="L189">                .append(&quot;.&quot;)</span>
+<span class="nc" id="L190">                .append(System.lineSeparator())</span>
+<span class="nc" id="L191">                .append(&quot;Resulting in classpath:&quot;);</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (classpath.isEmpty()) {</span>
+<span class="nc" id="L193">            sb.append(&quot; empty&quot;).append(System.lineSeparator());</span>
+        } else {
+<span class="nc" id="L195">            sb.append(System.lineSeparator());</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            for (URI uri : classpath) {</span>
+<span class="nc" id="L197">                sb.append(&quot;\t&quot;).append(uri.toString()).append(System.lineSeparator());</span>
+<span class="nc" id="L198">            }</span>
+        }
+<span class="nc" id="L200">        List&lt;String&gt; missingPaths = getMissingPaths(driverPath);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (!missingPaths.isEmpty()) {</span>
+<span class="nc" id="L202">            sb.append(&quot;There were missing paths in driverPath:&quot;).append(System.lineSeparator());</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            for (String path : missingPaths) {</span>
+<span class="nc" id="L204">                sb.append(&quot;\t&quot;).append(path).append(System.lineSeparator());</span>
+<span class="nc" id="L205">            }</span>
+<span class="nc" id="L206">            sb</span>
+<span class="nc" id="L207">                    .append(&quot;Use commandline option '-dp' to specify driver location.&quot;)</span>
+<span class="nc" id="L208">                    .append(System.lineSeparator())</span>
+<span class="nc" id="L209">                    .append(&quot;If you need to load sibling jars used '-loadjars'&quot;);</span>
+        }
+<span class="nc" id="L211">        return sb.toString();</span>
+    }
+
+    private void loadAdditionalJarsForDriver(String driverPath, Set&lt;URI&gt; classpath) {
+<span class="nc" id="L215">        File driverFolder = new File(Paths.get(driverPath).getParent().toString());</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (driverFolder.exists()) {</span>
+<span class="nc" id="L217">            File[] files = driverFolder.listFiles(</span>
+<span class="nc" id="L218">                    (dir, name) -&gt; name.toLowerCase().matches(&quot;.*\\.?ar$&quot;)</span>
+            );
+
+<span class="nc" id="L221">            LOGGER.info(&quot;Additional files will be loaded for JDBC Driver&quot;);</span>
+
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (files != null) {</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                for (File file : files) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                    if (file.isFile()) {</span>
+<span class="nc" id="L226">                        classpath.add(file.toURI());</span>
+<span class="nc" id="L227">                        LOGGER.info(&quot;Added: {}&quot;, file.toURI());</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L232">    }</span>
+
+    /**
+     * Returns a {@link ClassLoader class loader} to use for resolving {@link Driver}s.
+     *
+     * @param classpath
+     * @return
+     */
+    private ClassLoader getDriverClassLoader(Set&lt;URI&gt; classpath) {
+        ClassLoader loader;
+
+        // if a classpath has been specified then use it to find the driver,
+        // otherwise use whatever was used to load this class.
+        // thanks to Bruno Leonardo Gonalves for this implementation that he
+        // used to resolve issues when running under Maven
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (!classpath.isEmpty()) {</span>
+<span class="nc" id="L248">            URL[] urls = classpath.stream().map(uri -&gt; {</span>
+                try {
+<span class="nc" id="L250">                    return uri.toURL();</span>
+<span class="nc" id="L251">                } catch (MalformedURLException e) {</span>
+<span class="nc" id="L252">                    return null;</span>
+                }
+<span class="nc" id="L254">            }).filter(Objects::nonNull).collect(Collectors.toList()).toArray(new URL[classpath.size()]);</span>
+<span class="nc" id="L255">            loader = new URLClassLoader(urls);</span>
+<span class="nc" id="L256">        } else {</span>
+<span class="fc" id="L257">            loader = getClass().getClassLoader();</span>
+        }
+
+<span class="fc" id="L260">        return loader;</span>
+    }
+
+    /**
+     * Returns a list of {@link File}s in &lt;code&gt;path&lt;/code&gt; that do not exist.
+     * The intent is to aid in diagnosing invalid paths.
+     *
+     * @param path
+     * @return
+     */
+    private List&lt;String&gt; getMissingPaths(String path) {
+<span class="nc" id="L271">        List&lt;String&gt; missingFiles = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L273">        String[] pieces = path.split(File.pathSeparator);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        for (String piece : pieces) {</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            if (!new File(piece).exists())</span>
+<span class="nc" id="L276">                missingFiles.add(piece);</span>
+        }
+
+<span class="nc" id="L279">        return missingFiles;</span>
+    }
+
+    /**
+     * Returns a list of {@link URL}s in &lt;code&gt;path&lt;/code&gt; that point to files that
+     * exist.
+     *
+     * @param path
+     * @return
+     */
+    private Set&lt;URI&gt; getExistingUrls(String path) {
+<span class="fc" id="L290">        Set&lt;URI&gt; existingUrls = new HashSet&lt;&gt;();</span>
+
+<span class="fc" id="L292">        String[] pieces = path.split(File.pathSeparator);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (String piece : pieces) {</span>
+<span class="fc" id="L294">            File file = new File(piece);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            if (file.exists()) {</span>
+<span class="nc" id="L296">                existingUrls.add(file.toURI());</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if (file.isDirectory()) {</span>
+<span class="nc" id="L298">                    addDirectoryContent(file, existingUrls);</span>
+                }
+            }
+        }
+
+<span class="fc" id="L303">        return existingUrls;</span>
+    }
+
+    private void addDirectoryContent(File dir, Set&lt;URI&gt; existingUrls) {
+<span class="nc" id="L307">        File[] files = dir.listFiles();</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        for(File file : files) {</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            if (file.exists()) {</span>
+<span class="nc" id="L310">                existingUrls.add(file.toURI());</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (file.isDirectory()) {</span>
+<span class="nc" id="L312">                    addDirectoryContent(file, existingUrls);</span>
+                }
+            }
+        }
+<span class="nc" id="L316">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

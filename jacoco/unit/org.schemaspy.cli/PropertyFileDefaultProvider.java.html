@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PropertyFileDefaultProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.cli</a> &gt; <span class="el_source">PropertyFileDefaultProvider.java</span></div><h1>PropertyFileDefaultProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.cli;
+
+import com.beust.jcommander.IDefaultProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Objects;
+import java.util.Properties;
+
+/**
+ * Implementation of {@link IDefaultProvider} that provides values reading from a {@link Properties} file.
+ *
+ * TODO
+ * JCommander already provides a com.beust.jcommander.defaultprovider.PropertyFileDefaultProvider.
+ * But it always reports &quot;cannot find file on classpath&quot; although it exists. Maybe open an issue at the JCommander project?
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class PropertyFileDefaultProvider implements IDefaultProvider {
+
+<span class="fc" id="L48">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final Properties properties;
+
+<span class="fc" id="L52">    public PropertyFileDefaultProvider(String propertiesFilename) {</span>
+<span class="fc" id="L53">        Objects.requireNonNull(propertiesFilename);</span>
+<span class="fc" id="L54">        properties = loadProperties(propertiesFilename);</span>
+<span class="fc" id="L55">    }</span>
+
+    private static Properties loadProperties(String path) {
+        try {
+<span class="fc" id="L59">            String contents = new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L60">            Properties properties = new Properties();</span>
+            // Replace backslashes with double backslashes to escape windows path separator.
+            // Example input: schemaspy.o=C:\tools\schemaspy\output
+<span class="fc" id="L63">            properties.load(new StringReader(contents.replace(&quot;\\&quot;, &quot;\\\\&quot;)));</span>
+<span class="fc" id="L64">            return properties;</span>
+<span class="nc" id="L65">        } catch (IOException e) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;Could not find or load properties file: &quot; + path, e);</span>
+        }
+    }
+
+    @Override
+    public String getDefaultValueFor(String optionName) {
+<span class="fc" id="L72">        return properties.getProperty(optionName);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

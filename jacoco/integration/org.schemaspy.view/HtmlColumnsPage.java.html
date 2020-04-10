@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HtmlColumnsPage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.view</a> &gt; <span class="el_source">HtmlColumnsPage.java</span></div><h1>HtmlColumnsPage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2016 Ismail Simsek
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.view;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.Writer;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * The page that lists all of the columns in the schema,
+ * allowing the end user to sort by column's attributes.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Thomas Traude
+ * @author Nils Petzaell
+ */
+public class HtmlColumnsPage {
+
+<span class="fc" id="L54">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final MustacheCompiler mustacheCompiler;
+
+<span class="fc" id="L58">    public HtmlColumnsPage(MustacheCompiler mustacheCompiler) {</span>
+<span class="fc" id="L59">        this.mustacheCompiler = mustacheCompiler;</span>
+<span class="fc" id="L60">    }</span>
+
+    public void write(Collection&lt;Table&gt; tables, Writer writer) {
+<span class="fc" id="L63">        Set&lt;TableColumn&gt; indexedColumns = tables.stream()</span>
+<span class="fc" id="L64">                .flatMap(table -&gt; table.getIndexes().stream())</span>
+<span class="fc" id="L65">                .flatMap(tableIndex -&gt; tableIndex.getColumns().stream())</span>
+<span class="fc" id="L66">                .collect(Collectors.toSet());</span>
+
+<span class="fc" id="L68">        Set&lt;MustacheTableColumn&gt; tableColumns = tables.stream()</span>
+<span class="fc" id="L69">                .flatMap(table -&gt; table.getColumns().stream())</span>
+<span class="fc" id="L70">                .map(tableColumn -&gt; new MustacheTableColumn(tableColumn, indexedColumns.contains(tableColumn), mustacheCompiler.getRootPath(0)))</span>
+<span class="fc" id="L71">                .collect(Collectors.toSet());</span>
+
+<span class="fc" id="L73">        JSONArray columns = new JSONArray();</span>
+
+<span class="fc" id="L75">        tableColumns.forEach(mc -&gt; {</span>
+<span class="fc" id="L76">            columns.put(switchToLinkedHashMap(new JSONObject())</span>
+<span class="fc" id="L77">                .put(&quot;tableName&quot;, valueOrEmptyString(mc.getColumn().getTable().getName()))</span>
+<span class="fc" id="L78">                .put(&quot;tableFileName&quot;, valueOrEmptyString(FileNameGenerator.generate(mc.getColumn().getTable().getName())))</span>
+<span class="fc" id="L79">                .put(&quot;tableType&quot;, valueOrEmptyString(mc.getColumn().getTable().getType()))</span>
+<span class="fc" id="L80">                .put(&quot;keyClass&quot;, valueOrEmptyString(mc.getKeyClass()))</span>
+<span class="fc" id="L81">                .put(&quot;keyTitle&quot;, valueOrEmptyString(mc.getKeyTitle()))</span>
+<span class="fc" id="L82">                .put(&quot;name&quot;, valueOrEmptyString(mc.getKeyIcon())+valueOrEmptyString(mc.getColumn().getName()))</span>
+<span class="fc" id="L83">                .put(&quot;type&quot;, valueOrEmptyString(mc.getColumn().getTypeName()))</span>
+<span class="fc" id="L84">                .put(&quot;length&quot;, mc.getColumn().getLength())</span>
+<span class="fc" id="L85">                .put(&quot;nullable&quot;, valueOrEmptyString(mc.getNullable()))</span>
+<span class="fc" id="L86">                .put(&quot;autoUpdated&quot;, valueOrEmptyString(mc.getAutoUpdated()))</span>
+<span class="fc" id="L87">                .put(&quot;defaultValue&quot;, valueOrEmptyString(mc.getDefaultValue()))</span>
+<span class="fc" id="L88">                .put(&quot;comments&quot;, valueOrEmptyString(mc.getComments())));</span>
+<span class="fc" id="L89">        });</span>
+
+<span class="fc" id="L91">        PageData pageData = new PageData.Builder()</span>
+<span class="fc" id="L92">                .templateName(&quot;column.html&quot;)</span>
+<span class="fc" id="L93">                .scriptName(&quot;column.js&quot;)</span>
+<span class="fc" id="L94">                .addToScope(&quot;tableData&quot;, columns.toString(4))</span>
+<span class="fc" id="L95">                .depth(0)</span>
+<span class="fc" id="L96">                .getPageData();</span>
+
+        try {
+<span class="fc" id="L99">            mustacheCompiler.write(pageData, writer);</span>
+<span class="nc" id="L100">        } catch (IOException e) {</span>
+<span class="nc" id="L101">            LOGGER.error(&quot;Failed to write columns page&quot;, e);</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">    }</span>
+
+    private static JSONObject switchToLinkedHashMap(JSONObject jsonObject) {
+        try {
+<span class="fc" id="L107">            Field map = JSONObject.class.getDeclaredField(&quot;map&quot;);</span>
+<span class="fc" id="L108">            map.setAccessible(true);</span>
+<span class="fc" id="L109">            map.set(jsonObject, new LinkedHashMap&lt;&gt;());</span>
+<span class="fc" id="L110">            map.setAccessible(false);</span>
+<span class="nc" id="L111">        } catch (NoSuchFieldException | IllegalAccessException e) {</span>
+<span class="nc" id="L112">            LOGGER.debug(&quot;Failed to replace hashmap with linkedhashmap in JSONObject&quot;, e);</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        return jsonObject;</span>
+    }
+
+    private static String valueOrEmptyString(String value) {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        return Objects.nonNull(value) ? value : &quot;&quot; ;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

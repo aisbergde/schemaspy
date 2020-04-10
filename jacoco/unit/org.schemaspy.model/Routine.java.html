@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Routine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">Routine.java</span></div><h1>Routine.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2011 John Currier
+ * Copyright (C) 2017 Mårten Bohlin
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Metadata about a stored procedure or function
+ *
+ * @author John Currier
+ * @author Mårten Bohlin
+ */
+public class Routine implements Comparable&lt;Routine&gt; {
+    private final String name;
+    private final String type;
+    private final String definitionLanguage;
+    private final String definition;
+    private final boolean deterministic;
+    private final String dataAccess;
+    private final String securityType;
+    private final String comment;
+    private final String returnType;
+<span class="fc" id="L42">    private final List&lt;RoutineParameter&gt; params = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * @param name
+     * @param type
+     * @param returnType
+     * @param definitionLanguage
+     * @param definition
+     * @param deterministic
+     * @param dataAccess
+     * @param securityType
+     * @param comment
+     */
+    public Routine(String name,
+                    String type, // function or procedure
+                    String returnType,
+                    String definitionLanguage,
+                    String definition,
+                    boolean deterministic, String dataAccess,
+<span class="fc" id="L61">                    String securityType, String comment) {</span>
+<span class="fc" id="L62">        this.name = name;</span>
+<span class="fc" id="L63">        this.type = type;</span>
+<span class="fc" id="L64">        this.returnType = returnType;</span>
+<span class="fc" id="L65">        this.definitionLanguage = definitionLanguage;</span>
+<span class="fc" id="L66">        this.definition = coalesce(definition, &quot;&quot;);</span>
+<span class="fc" id="L67">        this.dataAccess = dataAccess;</span>
+<span class="fc" id="L68">        this.securityType = securityType;</span>
+<span class="fc" id="L69">        this.deterministic = deterministic;</span>
+<span class="fc" id="L70">        this.comment = comment;</span>
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * @return
+     */
+    public String getName() {
+<span class="fc" id="L77">        return name;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getType() {
+<span class="fc" id="L84">        return type;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getDefinitionLanguage() {
+<span class="fc" id="L91">        return definitionLanguage;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getDefinition() {
+<span class="fc" id="L98">        return definition;</span>
+    }
+
+    /**
+     * @return
+     */
+    public boolean isDeterministic() {
+<span class="fc" id="L105">        return deterministic;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getDataAccess() {
+<span class="fc" id="L112">        return dataAccess;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getSecurityType() {
+<span class="fc" id="L119">        return securityType;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getComment() {
+<span class="fc" id="L126">        return comment;</span>
+    }
+
+    /**
+     * Returns the return type for the routine or null if there is none
+     *
+     * @return
+     */
+    public String getReturnType() {
+<span class="fc" id="L135">        return returnType;</span>
+    }
+
+    /**
+     * @param param
+     */
+    public void addParameter(RoutineParameter param) {
+<span class="fc" id="L142">        params.add(param);</span>
+<span class="fc" id="L143">    }</span>
+
+    /**
+     * Returns the types of the routine's parameters.
+     * @return
+     */
+    public List&lt;RoutineParameter&gt; getParameters() {
+<span class="fc" id="L150">        return params;</span>
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Comparable#compareTo(java.lang.Object)
+     */
+    public int compareTo(Routine other) {
+<span class="nc" id="L157">        int rc = getName().compareTo(other.getName());</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (rc == 0)</span>
+<span class="nc" id="L159">            rc = getType().compareTo(other.getType());</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (rc == 0)</span>
+<span class="nc" id="L161">            rc = String.valueOf(getReturnType()).compareTo(String.valueOf(other.getReturnType()));</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (rc == 0)</span>
+<span class="nc" id="L163">            rc = getDefinition().compareTo(other.getDefinition());</span>
+<span class="nc" id="L164">        return rc;</span>
+    }
+
+    private &lt;T&gt; T coalesce(T a, T b) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        return a!=null ? a : b;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

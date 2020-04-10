@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PropertiesFinder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.config</a> &gt; <span class="el_source">PropertiesFinder.java</span></div><h1>PropertiesFinder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.config;
+
+import org.schemaspy.input.dbms.exceptions.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.*;
+import java.util.Collections;
+import java.util.Objects;
+
+/**
+ * @author Nils Petzaell
+ * @author Daniel Watt
+ */
+<span class="fc" id="L40">public class PropertiesFinder implements ResourceFinder {</span>
+
+<span class="fc" id="L42">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private static final String DB_TYPES_LOCATION = &quot;org/schemaspy/types/&quot;;
+
+    public URL find(final String dbType) {
+<span class="fc" id="L47">        String dbTypeToFind = addExtensionIfMissing(dbType);</span>
+<span class="fc" id="L48">        URL url = findFile(dbTypeToFind);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (Objects.isNull(url)) {</span>
+<span class="fc" id="L50">            url = findClassPath(dbTypeToFind);</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (Objects.isNull(url)) {</span>
+<span class="fc" id="L53">            url = findClassPath(DB_TYPES_LOCATION + dbTypeToFind);</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (Objects.isNull(url)) {</span>
+<span class="fc" id="L56">            throw new ResourceNotFoundException(dbType);</span>
+        }
+<span class="fc" id="L58">        return url;</span>
+    }
+
+    private String addExtensionIfMissing(String dbType) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        return dbType.toLowerCase().endsWith(&quot;.properties&quot;) ? dbType : dbType + &quot;.properties&quot;;</span>
+    }
+
+    private URL findFile(String file) {
+<span class="fc" id="L66">        Path path = Paths.get(file);</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">        if (path.toFile().exists() &amp;&amp; path.toFile().isFile()) {</span>
+            try {
+<span class="fc" id="L69">                return path.toUri().toURL();</span>
+<span class="nc" id="L70">            } catch (MalformedURLException e) {</span>
+<span class="nc" id="L71">                LOGGER.debug(&quot;Couldn't convert existing file: {}&quot;, path, e);</span>
+<span class="nc" id="L72">                return null;</span>
+            }
+        }
+<span class="fc" id="L75">        return null;</span>
+    }
+
+    private URL findClassPath(String resource) {
+<span class="fc" id="L79">        URL url = this.getClass().getClassLoader().getResource(resource);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (Objects.nonNull(url)) {</span>
+            try {
+                Path path;
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                if (&quot;jar&quot;.equals(url.getProtocol())) {</span>
+<span class="nc" id="L84">                    ensureFileSystemExists(url);</span>
+<span class="nc" id="L85">                    path = fixSpringBootPath(url.toString());</span>
+                } else {
+<span class="fc" id="L87">                    path = Paths.get(url.toURI());</span>
+                }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                if (Files.isRegularFile(path)) { //NOSONAR toFile().isFile() doesn't work with Zip filesystem</span>
+<span class="fc" id="L90">                    return url;</span>
+                }
+<span class="nc" id="L92">            } catch (URISyntaxException e) {</span>
+<span class="nc" id="L93">                LOGGER.debug(&quot;Couldn't convert url to uri to file: {}&quot;, url, e);</span>
+<span class="nc" id="L94">                return null;</span>
+<span class="nc" id="L95">            } catch (IOException e) {</span>
+<span class="nc" id="L96">                LOGGER.error(&quot;Unable to create filesystem for url: {}&quot;, url, e);</span>
+<span class="nc" id="L97">            }</span>
+        }
+<span class="fc" id="L99">        return null;</span>
+    }
+
+    private Path fixSpringBootPath(String s) {
+<span class="nc" id="L103">        URI uri = URI.create(s.replace(&quot;classes!&quot;,&quot;classes&quot;));</span>
+<span class="nc" id="L104">        return Paths.get(uri);</span>
+    }
+
+    private void ensureFileSystemExists(URL url) throws URISyntaxException, IOException {
+        try {
+<span class="nc" id="L109">            FileSystems.getFileSystem(url.toURI());</span>
+<span class="nc" id="L110">        } catch (FileSystemNotFoundException notFound) {</span>
+<span class="nc" id="L111">            FileSystems.newFileSystem(url.toURI(), Collections.singletonMap(&quot;create&quot;,&quot;false&quot;));</span>
+<span class="nc" id="L112">        }</span>
+<span class="nc" id="L113">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

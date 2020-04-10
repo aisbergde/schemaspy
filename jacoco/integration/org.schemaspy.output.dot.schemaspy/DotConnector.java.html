@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DotConnector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.dot.schemaspy</a> &gt; <span class="el_source">DotConnector.java</span></div><h1>DotConnector.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.dot.schemaspy;
+
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+
+/**
+ * Represents Graphvis dot's concept of an edge.  That is, a connector between two nodes.
+ *
+ * @author John Currier
+ * @author Nils Petzaell
+ */
+public class DotConnector implements Comparable&lt;DotConnector&gt; {
+    private final TableColumn parentColumn;
+    private final Table parentTable;
+    private final TableColumn childColumn;
+    private final Table childTable;
+    private final boolean implied;
+    private String parentPort;
+    private String childPort;
+
+    /**
+     * Create an edge that logically connects a child column to a parent column.
+     *
+     * @param parentColumn TableColumn
+     * @param childColumn TableColumn
+     * @param implied boolean
+     */
+<span class="fc" id="L47">    public DotConnector(TableColumn parentColumn, TableColumn childColumn, boolean implied) {</span>
+<span class="fc" id="L48">        this.parentColumn = parentColumn;</span>
+<span class="fc" id="L49">        this.childColumn = childColumn;</span>
+<span class="fc" id="L50">        this.implied = implied;</span>
+<span class="fc" id="L51">        parentPort = parentColumn.getName();</span>
+<span class="fc" id="L52">        parentTable = parentColumn.getTable();</span>
+<span class="fc" id="L53">        childPort = childColumn.getName();</span>
+<span class="fc" id="L54">        childTable = childColumn.getTable();</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Returns true if this edge logically &quot;points to&quot; the specified table
+     *
+     * @param possibleParentTable Table
+     * @return boolean
+     */
+    public boolean pointsTo(Table possibleParentTable) {
+<span class="fc" id="L64">        return possibleParentTable.equals(parentTable);</span>
+    }
+
+    public boolean isImplied() {
+<span class="fc" id="L68">        return implied;</span>
+    }
+
+    /**
+     * By default a parent edge connects to the column name...this lets you
+     * connect it the parent's type column instead (e.g. for detailed parents)
+     *
+     * Yes, I need to find a more appropriate name/metaphor for this method....
+     */
+    public void connectToParentDetails() {
+<span class="fc" id="L78">        parentPort = parentColumn.getName() + &quot;.type&quot;;</span>
+<span class="fc" id="L79">    }</span>
+
+    public void connectToParentTitle() {
+<span class="fc" id="L82">        parentPort = &quot;elipses&quot;;</span>
+<span class="fc" id="L83">    }</span>
+
+    public void connectToChildTitle() {
+<span class="fc" id="L86">        childPort = &quot;elipses&quot;;</span>
+<span class="fc" id="L87">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L91">        StringBuilder edge = new StringBuilder();</span>
+<span class="fc" id="L92">        edge.append(&quot;  \&quot;&quot;);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (childTable.isRemote()) {</span>
+<span class="nc" id="L94">            edge.append(childTable.getContainer());</span>
+<span class="nc" id="L95">            edge.append('.');</span>
+        }
+<span class="fc" id="L97">        edge.append(childTable.getName());</span>
+<span class="fc" id="L98">        edge.append(&quot;\&quot;:\&quot;&quot;);</span>
+<span class="fc" id="L99">        edge.append(childPort);</span>
+<span class="fc" id="L100">        edge.append(&quot;\&quot;:&quot;);</span>
+<span class="fc" id="L101">        edge.append(&quot;w -&gt; \&quot;&quot;);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (parentTable.isRemote()) {</span>
+<span class="nc" id="L103">            edge.append(parentTable.getContainer());</span>
+<span class="nc" id="L104">            edge.append('.');</span>
+        }
+<span class="fc" id="L106">        edge.append(parentTable.getName());</span>
+<span class="fc" id="L107">        edge.append(&quot;\&quot;:\&quot;&quot;);</span>
+<span class="fc" id="L108">        edge.append(parentPort);</span>
+<span class="fc" id="L109">        edge.append(&quot;\&quot;:&quot;);</span>
+<span class="fc" id="L110">        edge.append(&quot;e &quot;);</span>
+
+        // if enabled makes the diagram unreadable
+        // have to figure out how to render these details in a readable manner
+<span class="fc" id="L114">        final boolean fullErNotation = false;</span>
+
+        // Thanks to Dan Zingaro for figuring out how to correctly annotate
+        // these relationships
+        if (fullErNotation) {
+            // PK end of connector
+            edge.append(&quot;[arrowhead=&quot;);
+            if (childColumn.isNullable())
+                edge.append(&quot;odottee&quot;); // zero or one parents
+            else
+                edge.append(&quot;teetee&quot;);  // one parent
+            edge.append(&quot; dir=both&quot;);
+        } else {
+            // PK end of connector
+<span class="fc" id="L128">            edge.append(&quot;[arrowhead=none&quot;);</span>
+<span class="fc" id="L129">            edge.append(&quot; dir=back&quot;);</span>
+        }
+
+        // FK end of connector
+<span class="fc" id="L133">        edge.append(&quot; arrowtail=&quot;);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (childColumn.isUnique())</span>
+<span class="fc" id="L135">            edge.append(&quot;teeodot&quot;); // zero or one children</span>
+        else
+<span class="fc" id="L137">            edge.append(&quot;crowodot&quot;);// zero or more children</span>
+
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (implied)</span>
+<span class="fc" id="L140">            edge.append(&quot; style=dashed&quot;);</span>
+<span class="fc" id="L141">        edge.append(&quot;];&quot;);</span>
+
+<span class="fc" id="L143">        return edge.toString();</span>
+    }
+
+    public int compareTo(DotConnector other) {
+<span class="fc" id="L147">        int rc = childTable.compareTo(other.childTable);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (rc == 0)</span>
+<span class="fc" id="L149">            rc = childColumn.getName().compareToIgnoreCase(other.childColumn.getName());</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (rc == 0)</span>
+<span class="fc" id="L151">            rc = parentTable.compareTo(other.parentTable);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (rc == 0)</span>
+<span class="fc" id="L153">            rc = parentColumn.getName().compareToIgnoreCase(other.parentColumn.getName());</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        if (rc == 0 &amp;&amp; implied != other.implied)</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            rc = implied ? 1 : -1;</span>
+<span class="fc" id="L156">        return rc;</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (!(other instanceof DotConnector))</span>
+<span class="nc" id="L162">            return false;</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        return compareTo((DotConnector)other) == 0;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        int p = parentTable == null ? 0 : parentTable.getName().hashCode();</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        int c = childTable == null ? 0 : childTable.getName().hashCode();</span>
+<span class="fc" id="L170">        return (p &lt;&lt; 16) &amp; c;</span>
+    }
+
+    public TableColumn getParentColumn() {
+<span class="nc" id="L174">        return parentColumn;</span>
+    }
+
+    public Table getParentTable() {
+<span class="fc" id="L178">        return parentTable;</span>
+    }
+
+    public TableColumn getChildColumn() {
+<span class="nc" id="L182">        return childColumn;</span>
+    }
+
+    public Table getChildTable() {
+<span class="fc" id="L186">        return childTable;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

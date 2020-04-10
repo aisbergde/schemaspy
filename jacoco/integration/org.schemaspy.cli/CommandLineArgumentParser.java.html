@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommandLineArgumentParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.cli</a> &gt; <span class="el_source">CommandLineArgumentParser.java</span></div><h1>CommandLineArgumentParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.cli;
+
+import com.beust.jcommander.IDefaultProvider;
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.ParameterDescription;
+import com.beust.jcommander.ParameterException;
+import org.schemaspy.Config;
+import org.schemaspy.input.dbms.config.PropertiesResolver;
+import org.schemaspy.util.DbSpecificConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * This class uses {@link JCommander} to parse the SchemaSpy command line arguments represented by {@link CommandLineArguments}.
+ *
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class CommandLineArgumentParser {
+
+<span class="fc" id="L52">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L54">    private static final PropertiesResolver propertiesResolver = new PropertiesResolver();</span>
+
+    private final JCommander jCommander;
+
+    private final CommandLineArguments arguments;
+
+<span class="fc" id="L60">    private static final String[] requiredFields = {&quot;outputDirectory&quot;};</span>
+
+<span class="fc" id="L62">    public CommandLineArgumentParser(CommandLineArguments commandLineArguments, IDefaultProvider defaultProvider) {</span>
+<span class="fc" id="L63">        this.arguments = commandLineArguments;</span>
+<span class="fc" id="L64">        jCommander = JCommander.newBuilder()</span>
+<span class="fc" id="L65">                .acceptUnknownOptions(true)</span>
+<span class="fc" id="L66">                .programName(&quot;java -jar &quot; + Config.getLoadedFromJar())</span>
+<span class="fc" id="L67">                .columnSize(120)</span>
+<span class="fc" id="L68">                .defaultProvider(defaultProvider)</span>
+<span class="fc" id="L69">                .build();</span>
+<span class="fc" id="L70">        jCommander.addObject(arguments);</span>
+<span class="fc" id="L71">    }</span>
+
+    public CommandLineArguments parse(String... localArgs) {
+<span class="fc" id="L74">        jCommander.parse(localArgs);</span>
+
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (shouldValidate()) {</span>
+<span class="fc" id="L77">            validate(arguments);</span>
+        }
+<span class="fc" id="L79">        return arguments;</span>
+    }
+
+    private boolean shouldValidate() {
+<span class="fc" id="L83">        List&lt;ParameterDescription&gt; helpParameters = jCommander.getParameters()</span>
+<span class="fc" id="L84">                .stream()</span>
+<span class="fc" id="L85">                .filter(ParameterDescription::isHelp)</span>
+<span class="fc" id="L86">                .collect(Collectors.toList());</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for(ParameterDescription parameterDescription: helpParameters) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (parameterDescription.isAssigned()) {</span>
+<span class="nc" id="L89">                return false;</span>
+            }
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        return true;</span>
+    }
+
+    private void validate(CommandLineArguments arguments) {
+<span class="fc" id="L96">        List&lt;String&gt; runtimeRequiredFields = computeRequiredFields(arguments);</span>
+
+<span class="fc" id="L98">        List&lt;String&gt; missingFields = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L99">        Map&lt;String, ParameterDescription&gt; fieldToParameterDescription = jCommander.getParameters()</span>
+<span class="fc" id="L100">                .stream().collect(Collectors.toMap(</span>
+<span class="fc" id="L101">                        parameterDescription -&gt; parameterDescription.getParameterized().getName(),</span>
+<span class="fc" id="L102">                        parameterDescription -&gt; parameterDescription ));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (String field : runtimeRequiredFields) {</span>
+<span class="fc" id="L104">            ParameterDescription parameterDescription = fieldToParameterDescription.get(field);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (valueIsMissing(parameterDescription)) {</span>
+<span class="nc" id="L106">                missingFields.add(&quot;[&quot; + String.join(&quot; | &quot;, parameterDescription.getParameter().names()) + &quot;]&quot;);</span>
+            }
+<span class="fc" id="L108">        }</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!missingFields.isEmpty()) {</span>
+<span class="nc" id="L110">            String message = String.join(&quot;, &quot;, missingFields);</span>
+<span class="nc" id="L111">            throw new ParameterException(&quot;The following &quot;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    + (missingFields.size() == 1 ? &quot;option is required: &quot; : &quot;options are required: &quot;)</span>
+                    + message);
+        }
+<span class="fc" id="L115">    }</span>
+
+    private static List&lt;String&gt; computeRequiredFields(CommandLineArguments arguments) {
+<span class="fc" id="L118">        List&lt;String&gt; computedRequiredFields = new ArrayList&lt;&gt;(Arrays.asList(requiredFields));</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (!arguments.isSingleSignOn()) {</span>
+<span class="fc" id="L120">            computedRequiredFields.add(&quot;user&quot;);</span>
+        }
+<span class="fc" id="L122">        return computedRequiredFields;</span>
+    }
+
+    private static boolean valueIsMissing(ParameterDescription parameterDescription) {
+<span class="fc" id="L126">        Object value = parameterDescription.getParameterized().get(parameterDescription.getObject());</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (value instanceof String) {</span>
+<span class="fc" id="L128">            return ((String)value).isEmpty();</span>
+        }
+<span class="fc" id="L130">        return Objects.isNull(value);</span>
+    }
+
+
+    /**
+     * Prints documentation about the usage of command line arguments to the console.
+     * &lt;p&gt;
+     */
+    //TODO consider extracting dump generation to other class
+    public void printUsage() {
+<span class="nc" id="L140">        StringBuilder builder = new StringBuilder();</span>
+
+<span class="nc" id="L142">        jCommander.usage(builder);</span>
+
+<span class="nc" id="L144">        builder.append(System.lineSeparator());</span>
+<span class="nc" id="L145">        builder.append(&quot;Go to http://schemaspy.org for a complete list/description of additional parameters.&quot;);</span>
+<span class="nc" id="L146">        builder.append(System.lineSeparator());</span>
+<span class="nc" id="L147">        builder.append(System.lineSeparator());</span>
+<span class="nc" id="L148">        builder.append(&quot;Sample usage using the default database type (implied -t ora):&quot;);</span>
+<span class="nc" id="L149">        builder.append(System.lineSeparator());</span>
+<span class="nc" id="L150">        builder.append(System.lineSeparator());</span>
+<span class="nc" id="L151">        builder.append(&quot; java -jar schemaSpy.jar -db mydb -s myschema -u devuser -p password -o output&quot;);</span>
+<span class="nc" id="L152">        builder.append(System.lineSeparator());</span>
+<span class="nc" id="L153">        builder.append(System.lineSeparator());</span>
+
+<span class="nc" id="L155">        LOGGER.info(&quot;{}&quot;, builder);</span>
+<span class="nc" id="L156">    }</span>
+
+    /**
+     * Prints information of supported database types to the console.
+     * &lt;p&gt;
+     */
+    public void printDatabaseTypesHelp() {
+<span class="nc" id="L163">        String schemaspyJarFileName = Config.getLoadedFromJar();</span>
+
+<span class="nc" id="L165">        LOGGER.info(&quot;Built-in database types and their required connection parameters:&quot;);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        for (String type : Config.getBuiltInDatabaseTypes(schemaspyJarFileName)) {</span>
+<span class="nc" id="L167">            new DbSpecificConfig(type, propertiesResolver.getDbProperties(type)).dumpUsage();</span>
+<span class="nc" id="L168">        }</span>
+<span class="nc" id="L169">        LOGGER.info(&quot;You can use your own database types by specifying the filespec of a .properties file with -t.&quot;);</span>
+<span class="nc" id="L170">        LOGGER.info(&quot;Grab one out of {} and modify it to suit your needs.&quot;, schemaspyJarFileName);</span>
+<span class="nc" id="L171">    }</span>
+
+    public void printLicense() {
+<span class="nc" id="L174">        Resource gpl = new ClassPathResource(&quot;COPYING&quot;);</span>
+<span class="nc" id="L175">        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(gpl.getInputStream(), StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L176">            bufferedReader.lines().forEachOrdered(LOGGER::info);</span>
+<span class="nc" id="L177">        } catch (IOException e) {</span>
+<span class="nc" id="L178">            LOGGER.error(&quot;Failed to read COPYING (GPL)&quot;, e);</span>
+<span class="nc" id="L179">        }</span>
+<span class="nc" id="L180">        Resource lgpl = new ClassPathResource(&quot;COPYING.LESSER&quot;);</span>
+<span class="nc" id="L181">        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(lgpl.getInputStream(), StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L182">            bufferedReader.lines().forEachOrdered(LOGGER::info);</span>
+<span class="nc" id="L183">        } catch (IOException e) {</span>
+<span class="nc" id="L184">            LOGGER.error(&quot;Failed to read COPYING.LESSER (LGPL)&quot;, e);</span>
+<span class="nc" id="L185">        }</span>
+<span class="nc" id="L186">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

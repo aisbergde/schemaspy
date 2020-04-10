@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableColumn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">TableColumn.java</span></div><h1>TableColumn.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import org.schemaspy.input.dbms.xml.TableColumnMeta;
+
+import java.sql.DatabaseMetaData;
+import java.util.*;
+import java.util.regex.Pattern;
+
+/**
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Thomas Traude
+ * @author Daniel Watt
+ */
+public class TableColumn {
+    private final Table table;
+    private String name;
+    private Object id;
+    private String typeName;
+    private String shortTypeName;
+    private Integer type;
+    private int length;
+    private int decimalDigits;
+    private String detailedSize;
+    private boolean isNullable;
+    private boolean isAutoUpdated;
+    private Boolean isUnique;
+    private Object defaultValue;
+    private String comments;
+<span class="pc" id="L52">    private final Map&lt;TableColumn, ForeignKeyConstraint&gt; parents = new HashMap&lt;&gt;();</span>
+<span class="pc" id="L53">    private final Map&lt;TableColumn, ForeignKeyConstraint&gt; children = new TreeMap&lt;&gt;(new ColumnComparator());</span>
+<span class="pc" id="L54">    private boolean allowImpliedParents = true;</span>
+<span class="pc" id="L55">    private boolean allowImpliedChildren = true;</span>
+<span class="pc" id="L56">    private boolean isExcluded = false;</span>
+<span class="pc" id="L57">    private boolean isAllExcluded = false;</span>
+
+    /**
+     * Create a column associated with a table.
+     *
+     * @param table Table the table that this column belongs to
+     */
+<span class="fc" id="L64">    public TableColumn(Table table) {</span>
+<span class="fc" id="L65">        this.table = table;</span>
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * A TableColumn that's derived from something other than traditional database metadata
+     * (e.g. defined in XML).
+     *
+     * @param table
+     * @param colMeta
+     */
+<span class="nc" id="L75">    public TableColumn(Table table, TableColumnMeta colMeta) {</span>
+<span class="nc" id="L76">        this.table = table;</span>
+<span class="nc" id="L77">        name = colMeta.getName();</span>
+<span class="nc" id="L78">        id = colMeta.getId();</span>
+<span class="nc" id="L79">        typeName = colMeta.getType();</span>
+<span class="nc" id="L80">        length = colMeta.getSize();</span>
+<span class="nc" id="L81">        decimalDigits = colMeta.getDigits();</span>
+<span class="nc" id="L82">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L83">        buf.append(length);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (decimalDigits &gt; 0) {</span>
+<span class="nc" id="L85">            buf.append(',');</span>
+<span class="nc" id="L86">            buf.append(decimalDigits);</span>
+        }
+<span class="nc" id="L88">        detailedSize = buf.toString();</span>
+<span class="nc" id="L89">        isNullable = colMeta.isNullable();</span>
+<span class="nc" id="L90">        isAutoUpdated = colMeta.isAutoUpdated();</span>
+<span class="nc" id="L91">        defaultValue = colMeta.getDefaultValue();</span>
+<span class="nc" id="L92">        comments = colMeta.getComments();</span>
+<span class="nc" id="L93">    }</span>
+
+
+
+    /**
+     * Returns the {@link Table} that this column belongs to.
+     *
+     * @return
+     */
+    public Table getTable() {
+<span class="fc" id="L103">        return table;</span>
+    }
+
+    /**
+     * Returns the column's name.
+     *
+     * @return
+     */
+    public String getName() {
+<span class="fc" id="L112">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="fc" id="L116">        this.name = name;</span>
+<span class="fc" id="L117">    }</span>
+
+    /**
+     * Returns the ID of the column or &lt;code&gt;null&lt;/code&gt; if the database doesn't support the concept.
+     *
+     * @return
+     */
+    public Object getId() {
+<span class="fc" id="L125">        return id;</span>
+    }
+
+    public void setId(Object id) {
+<span class="fc" id="L129">        this.id = id;</span>
+<span class="fc" id="L130">    }</span>
+
+    /**
+     * Type of the column.
+     * See {@link DatabaseMetaData#getColumns(String, String, String, String)}'s &lt;code&gt;DATA_TYPE&lt;/code&gt;.
+     * @return integer from java.sql.Types or &lt;code&gt;null&lt;/code&gt; if not set
+     */
+    public Integer getType() {
+<span class="fc" id="L138">        return type;</span>
+    }
+
+    public void setType(Integer type) {
+<span class="fc" id="L142">    	this.type = type;</span>
+<span class="fc" id="L143">    }</span>
+    
+    /**
+     * Type of the column.
+     * See {@link DatabaseMetaData#getColumns(String, String, String, String)}'s &lt;code&gt;TYPE_NAME&lt;/code&gt;.
+     * @return
+     */
+    public String getTypeName() {
+<span class="fc" id="L151">        return typeName;</span>
+    }
+
+    /**
+     * Normally only used for &quot;special&quot; types such as enums.
+     *
+     * @param type
+     */
+    public void setTypeName(String type) {
+<span class="fc" id="L160">        this.typeName = type;</span>
+<span class="fc" id="L161">    }</span>
+
+    /**
+     * Abbreviated form of {@link #getTypeName()}
+     *
+     * @return
+     */
+    public String getShortTypeName() {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        return shortTypeName == null ? typeName : shortTypeName;</span>
+    }
+
+    /**
+     * Abbreviated form of {@link #setTypeName(String)}
+     *
+     * @param shortType
+     */
+    public void setShortType(String shortType) {
+<span class="fc" id="L178">        this.shortTypeName = shortType;</span>
+<span class="fc" id="L179">    }</span>
+
+    /**
+     * Length of the column.
+     * See {@link DatabaseMetaData#getColumns(String, String, String, String)}'s &lt;code&gt;BUFFER_LENGTH&lt;/code&gt;,
+     * or if that's &lt;code&gt;null&lt;/code&gt;, &lt;code&gt;COLUMN_SIZE&lt;/code&gt;.
+     * @return
+     */
+    public int getLength() {
+<span class="fc" id="L188">        return length;</span>
+    }
+
+    public void setLength(int length) {
+<span class="fc" id="L192">        this.length = length;</span>
+<span class="fc" id="L193">    }</span>
+
+    /**
+     * Decimal digits of the column.
+     * See {@link DatabaseMetaData#getColumns(String, String, String, String)}'s &lt;code&gt;DECIMAL_DIGITS&lt;/code&gt;.
+     *
+     * @return
+     */
+    public int getDecimalDigits() {
+<span class="fc" id="L202">        return decimalDigits;</span>
+    }
+
+    public void setDecimalDigits(int decimalDigits) {
+<span class="fc" id="L206">        this.decimalDigits = decimalDigits;</span>
+<span class="fc" id="L207">    }</span>
+
+    /**
+     * String representation of length with optional decimal digits (if decimal digits &amp;gt; 0).
+     *
+     * @return
+     */
+    public String getDetailedSize() {
+<span class="fc" id="L215">        return detailedSize;</span>
+    }
+
+    public void setDetailedSize(String detailedSize) {
+<span class="fc" id="L219">        this.detailedSize = detailedSize;</span>
+<span class="fc" id="L220">    }</span>
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if null values are allowed
+     *
+     * @return
+     */
+    public boolean isNullable() {
+<span class="fc" id="L228">        return isNullable;</span>
+    }
+
+    public void setNullable(boolean nullable) {
+<span class="fc" id="L232">        isNullable = nullable;</span>
+<span class="fc" id="L233">    }</span>
+
+    /**
+     * See {@link java.sql.ResultSetMetaData#isAutoIncrement(int)}
+     *
+     * @return
+     */
+    public boolean isAutoUpdated() {
+<span class="fc" id="L241">        return isAutoUpdated;</span>
+    }
+
+    /**
+     * setIsAutoUpdated
+     *
+     * @param isAutoUpdated boolean
+     */
+    public void setIsAutoUpdated(boolean isAutoUpdated) {
+<span class="fc" id="L250">        this.isAutoUpdated = isAutoUpdated;</span>
+<span class="fc" id="L251">    }</span>
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column can only contain unique values
+     *
+     * @return
+     */
+    public boolean isUnique() {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (isUnique == null) {</span>
+            // see if there's a unique index on this column by itself
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            for (TableIndex index : table.getIndexes()) {</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if (index.isUnique()) {</span>
+<span class="nc" id="L263">                    List&lt;TableColumn&gt; indexColumns = index.getColumns();</span>
+<span class="nc bnc" id="L264" title="All 4 branches missed.">                    if (indexColumns.size() == 1 &amp;&amp; indexColumns.contains(this)) {</span>
+<span class="nc" id="L265">                        isUnique = true;</span>
+<span class="nc" id="L266">                        break;</span>
+                    }
+                }
+<span class="nc" id="L269">            }</span>
+
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (isUnique == null) {</span>
+                // if it's a single PK column then it's unique
+<span class="nc bnc" id="L273" title="All 4 branches missed.">                isUnique = table.getPrimaryColumns().size() == 1 &amp;&amp; isPrimary();</span>
+            }
+        }
+
+<span class="nc" id="L277">        return isUnique;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column is a primary key
+     *
+     * @return
+     */
+    public boolean isPrimary() {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (table.getPrimaryColumns() != null) {</span>
+<span class="fc" id="L287">            return table.getPrimaryColumns().contains(this);</span>
+        }
+<span class="nc" id="L289">        return false;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column points to another table's primary key.
+     *
+     * @return
+     */
+    public boolean isForeignKey() {
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        return !parents.isEmpty();</span>
+    }
+
+    /**
+     * Returns the value that the database uses for this column if one isn't provided.
+     *
+     * @return
+     */
+    public Object getDefaultValue() {
+<span class="fc" id="L307">        return defaultValue;</span>
+    }
+
+    public void setDefaultValue(Object defaultValue) {
+<span class="fc" id="L311">        this.defaultValue = defaultValue;</span>
+<span class="fc" id="L312">    }</span>
+
+    /**
+     * @return Comments associated with this column, or &lt;code&gt;null&lt;/code&gt; if none.
+     */
+    public String getComments() {
+<span class="fc" id="L318">        return comments;</span>
+    }
+
+    /**
+     * See {@link #getComments()}
+     * @param comments
+     */
+    public void setComments(String comments) {
+<span class="pc bpc" id="L326" title="2 of 4 branches missed.">        this.comments = (comments == null || comments.trim().length() == 0) ? null : comments.trim();</span>
+<span class="fc" id="L327">    }</span>
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column is to be excluded from relationship diagrams.
+     * Unless {@link #isAllExcluded()} is true this column will be included in the detailed
+     * diagrams of the containing table.
+     *
+     * &lt;p&gt;This is typically an attempt to reduce clutter that can be introduced when many tables
+     * reference a given column.
+     *
+     * @return
+     */
+    public boolean isExcluded() {
+<span class="nc" id="L340">        return isExcluded;</span>
+    }
+
+    public void setExcluded(boolean excluded) {
+<span class="fc" id="L344">        isExcluded = excluded;</span>
+<span class="fc" id="L345">    }</span>
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column is to be excluded from all relationships in
+     * relationship diagrams.  This includes the detailed diagrams of the containing table.
+     *
+     * &lt;p&gt;This is typically an attempt to reduce clutter that can be introduced when many tables
+     * reference a given column.
+     *
+     * @return
+     */
+    public boolean isAllExcluded() {
+<span class="fc" id="L357">        return isAllExcluded;</span>
+    }
+
+    public void setAllExcluded(boolean allExcluded) {
+<span class="fc" id="L361">        isAllExcluded = allExcluded;</span>
+<span class="fc" id="L362">    }</span>
+
+    /**
+     * Add a parent column (PK) to this column (FK) via the associated constraint
+     *
+     * @param parent
+     * @param constraint
+     */
+    public void addParent(TableColumn parent, ForeignKeyConstraint constraint) {
+<span class="fc" id="L371">        parents.put(parent, constraint);</span>
+<span class="fc" id="L372">        table.addedParent();</span>
+<span class="fc" id="L373">    }</span>
+
+    /**
+     * Remove the specified parent column from this column
+     *
+     * @param parent
+     */
+    public void removeParent(TableColumn parent) {
+<span class="fc" id="L381">        parents.remove(parent);</span>
+<span class="fc" id="L382">    }</span>
+
+    /**
+     * Disassociate all parents from this column
+     */
+    public void unlinkParents() {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        for (TableColumn parent : parents.keySet()) {</span>
+<span class="fc" id="L389">            parent.removeChild(this);</span>
+<span class="fc" id="L390">        }</span>
+<span class="fc" id="L391">        parents.clear();</span>
+<span class="fc" id="L392">    }</span>
+
+    /**
+     * Returns the {@link Set} of all {@link TableColumn parents} associated with this column
+     *
+     * @return
+     */
+    public Set&lt;TableColumn&gt; getParents() {
+<span class="fc" id="L400">        return parents.keySet();</span>
+    }
+
+    /**
+     * Returns the constraint that connects this column to the specified column (this 'child' column to specified 'parent' column)
+     */
+    public ForeignKeyConstraint getParentConstraint(TableColumn parent) {
+<span class="fc" id="L407">        return parents.get(parent);</span>
+    }
+
+    /**
+     * Removes a parent constraint and returns it, or null if there are no parent constraints
+     *
+     * @return the removed {@link ForeignKeyConstraint}
+     */
+    public ForeignKeyConstraint removeAParentFKConstraint() {
+<span class="fc" id="L416">        return parents.entrySet().stream().findFirst().map(entry -&gt;  {</span>
+<span class="fc" id="L417">            parents.remove(entry.getKey());</span>
+<span class="fc" id="L418">            entry.getKey().removeChild(this);</span>
+<span class="fc" id="L419">            return entry.getValue();</span>
+<span class="fc" id="L420">        }).orElse(null);</span>
+    }
+
+    /**
+     * Remove one child {@link ForeignKeyConstraint} that points to this column.
+     *
+     * @return the removed constraint, or &lt;code&gt;null&lt;/code&gt; if none were available to be removed
+     */
+    public ForeignKeyConstraint removeAChildFKConstraint() {
+<span class="nc" id="L429">        return children.entrySet().stream().findFirst().map(entry -&gt;  {</span>
+<span class="nc" id="L430">            children.remove(entry.getKey());</span>
+<span class="nc" id="L431">            entry.getKey().removeParent(this);</span>
+<span class="nc" id="L432">            return entry.getValue();</span>
+<span class="nc" id="L433">        }).orElse(null);</span>
+    }
+
+    /**
+     * Add a child column (FK) to this column (PK) via the associated constraint
+     *
+     * @param child
+     * @param constraint
+     */
+    public void addChild(TableColumn child, ForeignKeyConstraint constraint) {
+<span class="fc" id="L443">        children.put(child, constraint);</span>
+<span class="fc" id="L444">        table.addedChild();</span>
+<span class="fc" id="L445">    }</span>
+
+    /**
+     * Remove the specified child column from this column
+     *
+     * @param child
+     */
+    public void removeChild(TableColumn child) {
+<span class="fc" id="L453">        children.remove(child);</span>
+<span class="fc" id="L454">    }</span>
+
+    /**
+     * Disassociate all children from this column
+     */
+    public void unlinkChildren() {
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        for (TableColumn child : children.keySet())</span>
+<span class="nc" id="L461">            child.removeParent(this);</span>
+<span class="fc" id="L462">        children.clear();</span>
+<span class="fc" id="L463">    }</span>
+
+    /**
+     * Returns &lt;code&gt;Set&lt;/code&gt; of &lt;code&gt;TableColumn&lt;/code&gt;s that have a real (or implied) foreign key that
+     * references this &lt;code&gt;TableColumn&lt;/code&gt;.
+     * @return Set
+     */
+    public Set&lt;TableColumn&gt; getChildren() {
+<span class="fc" id="L471">        return children.keySet();</span>
+    }
+
+    /**
+     * returns the constraint that connects the specified column to this column
+     * (specified 'child' to this 'parent' column)
+     */
+    public ForeignKeyConstraint getChildConstraint(TableColumn child) {
+<span class="fc" id="L479">        return children.get(child);</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if tableName.columnName matches the supplied
+     * regular expression.
+     *
+     * @param regex
+     * @return
+     */
+    public boolean matches(Pattern regex) {
+<span class="fc" id="L490">        return regex.matcher(getTable().getName() + '.' + getName()).matches();</span>
+    }
+
+    /**
+     * Update the state of this column with the supplied {@link TableColumnMeta}.
+     * Intended to be used with instances created by {@link #TableColumn(Table, TableColumnMeta)}.
+     *
+     * @param colMeta
+     */
+    public void update(TableColumnMeta colMeta) {
+<span class="nc" id="L500">        String newComments = colMeta.getComments();</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        if (newComments != null)</span>
+<span class="nc" id="L502">            setComments(newComments);</span>
+
+<span class="nc bnc" id="L504" title="All 4 branches missed.">        if (!isPrimary() &amp;&amp; colMeta.isPrimary()) {</span>
+<span class="nc" id="L505">            table.setPrimaryColumn(this);</span>
+        }
+
+<span class="nc bnc" id="L508" title="All 2 branches missed.">        allowImpliedParents  = !colMeta.isImpliedParentsDisabled();</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        allowImpliedChildren = !colMeta.isImpliedChildrenDisabled();</span>
+<span class="nc" id="L510">        isExcluded |= colMeta.isExcluded();</span>
+<span class="nc" id="L511">        isAllExcluded |= colMeta.isAllExcluded();</span>
+<span class="nc" id="L512">    }</span>
+
+    /**
+     * Returns the name of this column.
+     */
+    @Override
+    public String toString() {
+<span class="fc" id="L519">        return getName();</span>
+    }
+
+    /**
+     * Two {@link TableColumn}s are considered equal if their tables and names match.
+     */
+<span class="fc" id="L525">    private class ColumnComparator implements Comparator&lt;TableColumn&gt; {</span>
+        public int compare(TableColumn column1, TableColumn column2) {
+<span class="fc" id="L527">            int rc = column1.getTable().compareTo(column2.getTable());</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (rc == 0)</span>
+<span class="fc" id="L529">                rc = column1.getName().compareToIgnoreCase(column2.getName());</span>
+<span class="fc" id="L530">            return rc;</span>
+        }
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column is permitted to be an implied FK
+     * (based on name/type/size matches to PKs).
+     *
+     * @return
+     */
+    public boolean allowsImpliedParents() {
+<span class="fc" id="L541">        return allowImpliedParents;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this column is permitted to be a PK to an implied FK
+     * (based on name/type/size matches to PKs).
+     *
+     * @return
+     */
+    public boolean allowsImpliedChildren() {
+<span class="fc" id="L551">        return allowImpliedChildren;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

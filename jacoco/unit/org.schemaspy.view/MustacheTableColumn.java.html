@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MustacheTableColumn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.view</a> &gt; <span class="el_source">MustacheTableColumn.java</span></div><h1>MustacheTableColumn.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.view;
+
+import org.schemaspy.model.ForeignKeyConstraint;
+import org.schemaspy.model.TableColumn;
+import org.schemaspy.util.Markdown;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Created by rkasa on 2016-03-23.
+ *
+ * @author Rafal Kasa
+ * @author Nils Petzaell
+ */
+public class MustacheTableColumn {
+
+    private TableColumn column;
+<span class="nc" id="L39">    private List&lt;MustacheTableColumnRelatives&gt; parents = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L40">    private List&lt;MustacheTableColumnRelatives&gt; children = new ArrayList&lt;&gt;();</span>
+    private boolean indexColumn;
+    private String rootPath;
+
+<span class="nc" id="L44">    public MustacheTableColumn(TableColumn tableColumn) {</span>
+<span class="nc" id="L45">        this.column = tableColumn;</span>
+<span class="nc" id="L46">        prepareRelatives(children, false);</span>
+<span class="nc" id="L47">        prepareRelatives(parents, true);</span>
+<span class="nc" id="L48">    }</span>
+
+    public MustacheTableColumn(TableColumn tableColumn, boolean indexColumn, String rootPath) {
+<span class="nc" id="L51">        this(tableColumn);</span>
+<span class="nc" id="L52">        this.indexColumn = indexColumn;</span>
+<span class="nc" id="L53">        this.rootPath = rootPath;</span>
+<span class="nc" id="L54">    }</span>
+
+    public TableColumn getColumn() {
+<span class="nc" id="L57">        return column;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;name of css class primaryKey&lt;/code&gt; if this column is a primary key
+     *
+     * @return
+     */
+
+    public String getKey() {
+<span class="nc" id="L67">        String keyType = &quot;&quot;;</span>
+
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (column.isPrimary()) {</span>
+<span class="nc" id="L70">            keyType = &quot; class='primaryKey' title='Primary Key'&quot;;</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        } else if (column.isForeignKey()) {</span>
+<span class="nc" id="L72">            keyType = &quot; class='foreignKey' title='Foreign Key'&quot;;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        } else if (indexColumn) {</span>
+<span class="nc" id="L74">            keyType = &quot; class='&quot;+markAsIndexColumn()+&quot;' title='Indexed'&quot;;</span>
+        }
+
+<span class="nc" id="L77">        return keyType;</span>
+    }
+
+    public String getKeyTitle() {
+<span class="nc" id="L81">        String keyTitle= &quot;&quot;;</span>
+
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (column.isPrimary()) {</span>
+<span class="nc" id="L84">            keyTitle = &quot;Primary Key&quot;;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        } else if (column.isForeignKey()) {</span>
+<span class="nc" id="L86">            keyTitle = &quot;Foreign Key&quot;;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        } else if (indexColumn) {</span>
+<span class="nc" id="L88">            keyTitle = &quot;Indexed&quot;;</span>
+        }
+
+<span class="nc" id="L91">        return keyTitle;</span>
+    }
+
+    public String getKeyClass() {
+<span class="nc" id="L95">        String keyClass= &quot;&quot;;</span>
+
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (column.isPrimary()) {</span>
+<span class="nc" id="L98">            keyClass = &quot;primaryKey&quot;;</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        } else if (column.isForeignKey()) {</span>
+<span class="nc" id="L100">            keyClass = &quot;foreignKey&quot;;</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        } else if (indexColumn) {</span>
+<span class="nc" id="L102">            keyClass = &quot;indexedColumn&quot;;</span>
+        }
+
+<span class="nc" id="L105">        return keyClass;</span>
+    }
+
+    public String getKeyIcon() {
+<span class="nc" id="L109">        String keyIcon = &quot;&quot;;</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        if (column.isPrimary() || column.isForeignKey()) {</span>
+<span class="nc" id="L111">            keyIcon = &quot;&lt;i class='icon ion-key iconkey' style='padding-left: 5px;'&gt;&lt;/i&gt;&quot;;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        } else if (indexColumn) {</span>
+<span class="nc" id="L113">            keyIcon = &quot;&lt;i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'&gt;&lt;/i&gt;&quot;;</span>
+        }
+
+<span class="nc" id="L116">        return  keyIcon;</span>
+    }
+
+    public String getNullable() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        return column.isNullable() ? &quot;√&quot; : &quot;&quot;;</span>
+    }
+
+    public String getTitleNullable() {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        return column.isNullable() ? &quot;nullable&quot; : &quot;&quot;;</span>
+    }
+
+    public String getAutoUpdated() {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        return column.isAutoUpdated() ? &quot;√&quot; : &quot;&quot;;</span>
+    }
+
+    public String getTitleAutoUpdated() {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        return column.isAutoUpdated() ? &quot;Automatically updated by the database&quot; : &quot;&quot;;</span>
+    }
+
+    private String markAsIndexColumn() {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        return indexColumn ? &quot;indexedColumn&quot; : &quot;&quot;;</span>
+    }
+
+    public String getDefaultValue() {
+<span class="nc" id="L140">        return String.valueOf(column.getDefaultValue());</span>
+    }
+
+    public List&lt;MustacheTableColumnRelatives&gt; getParents() {
+<span class="nc" id="L144">        return parents;</span>
+    }
+
+    public List&lt;MustacheTableColumnRelatives&gt; getChildren() {
+<span class="nc" id="L148">        return children;</span>
+    }
+
+    public String getComments() {
+<span class="nc" id="L152">        String comments = column.getComments();</span>
+<span class="nc" id="L153">        comments = Markdown.toHtml(comments, rootPath);</span>
+<span class="nc" id="L154">        return comments;</span>
+    }
+
+    private void prepareRelatives(List&lt;MustacheTableColumnRelatives&gt; relatives, boolean dumpParents) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        Set&lt;TableColumn&gt; relativeColumns = dumpParents ? column.getParents() : column.getChildren();</span>
+
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        for (TableColumn relativeColumn : relativeColumns) {</span>
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            ForeignKeyConstraint constraint = dumpParents ? relativeColumn.getChildConstraint(this.column) : relativeColumn.getParentConstraint(this.column);</span>
+<span class="nc" id="L163">            MustacheTableColumnRelatives relative = new MustacheTableColumnRelatives(relativeColumn, constraint);</span>
+
+<span class="nc" id="L165">            relatives.add(relative);</span>
+<span class="nc" id="L166">        }</span>
+<span class="nc" id="L167">    }</span>
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

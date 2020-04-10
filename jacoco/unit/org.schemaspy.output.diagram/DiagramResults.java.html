@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiagramResults.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.diagram</a> &gt; <span class="el_source">DiagramResults.java</span></div><h1>DiagramResults.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.output.diagram;
+
+import java.io.File;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * @author Nils Petzaell
+ */
+public class DiagramResults {
+
+<span class="fc" id="L31">    private static final Pattern MAP_NAME_PATTERN = Pattern.compile(&quot;&lt;map.*name=\&quot;([\\w\\s]+).*&quot;);</span>
+
+    private final File diagramFile;
+    private final String diagramMapName;
+    private final String diagramMap;
+    private final String imageFormat;
+
+<span class="fc" id="L38">    public DiagramResults(File diagramFile, String diagramMap, String imageFormat) {</span>
+<span class="fc" id="L39">        this.diagramFile = diagramFile;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (Objects.nonNull(diagramMap)) {</span>
+<span class="fc" id="L41">            this.diagramMapName = diagramMapName(diagramMap);</span>
+<span class="fc" id="L42">            this.diagramMap = diagramMap.trim();</span>
+        } else {
+<span class="nc" id="L44">            this.diagramMapName = &quot;&quot;;</span>
+<span class="nc" id="L45">            this.diagramMap = &quot;&quot;;</span>
+        }
+<span class="fc" id="L47">        this.imageFormat = imageFormat;</span>
+<span class="fc" id="L48">    }</span>
+
+    private static String diagramMapName(String diagramMap) {
+<span class="fc" id="L51">        Matcher matcher = MAP_NAME_PATTERN.matcher(diagramMap);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (matcher.find()) {</span>
+<span class="fc" id="L53">            return matcher.group(1);</span>
+        }
+<span class="nc" id="L55">        return &quot;&quot;;</span>
+    }
+
+    public File getDiagramFile() {
+<span class="fc" id="L59">        return diagramFile;</span>
+    }
+
+    public String getDiagramMapName() {
+<span class="fc" id="L63">        return diagramMapName;</span>
+    }
+
+    public String getDiagramMap() {
+<span class="fc" id="L67">        return diagramMap;</span>
+    }
+
+    public String getImageFormat() {
+<span class="fc" id="L71">        return imageFormat;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

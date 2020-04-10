@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportForeignKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service.helper</a> &gt; <span class="el_source">ExportForeignKey.java</span></div><h1>ExportForeignKey.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2017 Rafal Kasa
+ * Copyright (C) 2019 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Foobar. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service.helper;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+/**
+ * @author Rafal Kasa
+ * @author Nils Petzaell
+ */
+public class ExportForeignKey {
+    private final String fkTableCat;
+    private final String fkTableSchema;
+    private final String fkTableName;
+
+<span class="fc" id="L34">    private ExportForeignKey(String fkTableCat, String fkTableSchema, String fkTableName) {</span>
+<span class="fc" id="L35">        this.fkTableCat = fkTableCat;</span>
+<span class="fc" id="L36">        this.fkTableSchema = fkTableSchema;</span>
+<span class="fc" id="L37">        this.fkTableName = fkTableName;</span>
+<span class="fc" id="L38">    }</span>
+
+    public String getFkTableCat() {
+<span class="fc" id="L41">        return fkTableCat;</span>
+    }
+
+    public String getFkTableSchema() {
+<span class="fc" id="L45">        return fkTableSchema;</span>
+    }
+
+    public String getFkTableName() {
+<span class="fc" id="L49">        return fkTableName;</span>
+    }
+
+<span class="fc" id="L52">    public static class Builder {</span>
+        private String fkTableCat;
+        private String fkTableSchema;
+        private String fkTableName;
+
+        public Builder fromExportedKeysResultSet(ResultSet resultSet) throws SQLException {
+<span class="fc" id="L58">            this.withFkTableCat(resultSet.getString(&quot;FKTABLE_CAT&quot;))</span>
+<span class="fc" id="L59">                    .withFkTableSchema(resultSet.getString(&quot;FKTABLE_SCHEM&quot;))</span>
+<span class="fc" id="L60">                    .withFkTableName(resultSet.getString(&quot;FKTABLE_NAME&quot;));</span>
+<span class="fc" id="L61">            return this;</span>
+        }
+
+        public Builder withFkTableCat(String fkTableCat) {
+<span class="fc" id="L65">            this.fkTableCat = fkTableCat;</span>
+<span class="fc" id="L66">            return this;</span>
+        }
+
+        public Builder withFkTableSchema(String fkTableSchema) {
+<span class="fc" id="L70">            this.fkTableSchema = fkTableSchema;</span>
+<span class="fc" id="L71">            return this;</span>
+        }
+
+        public Builder withFkTableName(String fkTableName) {
+<span class="fc" id="L75">            this.fkTableName = fkTableName;</span>
+<span class="fc" id="L76">            return this;</span>
+        }
+
+        public ExportForeignKey build() {
+<span class="fc" id="L80">            return new ExportForeignKey(fkTableCat, fkTableSchema, fkTableName);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

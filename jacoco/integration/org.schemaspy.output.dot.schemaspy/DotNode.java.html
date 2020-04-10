@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DotNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.dot.schemaspy</a> &gt; <span class="el_source">DotNode.java</span></div><h1>DotNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2018 Nils Petzaell
+ * Copyright (C) 2019 Kamyab Nazari
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.dot.schemaspy;
+
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.schemaspy.model.TableIndex;
+import org.schemaspy.output.dot.DotConfig;
+import org.schemaspy.view.FileNameGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.awt.*;
+import java.awt.font.FontRenderContext;
+import java.awt.geom.AffineTransform;
+import java.io.UnsupportedEncodingException;
+import java.lang.invoke.MethodHandles;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.text.NumberFormat;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Wojciech Kasa
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class DotNode {
+
+<span class="fc" id="L58">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+<span class="fc" id="L59">    private static final Html html = new Html();</span>
+<span class="fc" id="L60">    private static final StyleSheet CSS = StyleSheet.getInstance();</span>
+
+    private static final String INDENT_6 = &quot;      &quot;;
+    private static final String TABLES_PATH = &quot;/tables/&quot;; //NOSONAR
+
+    private final Table table;
+    private final String path;
+    private final DotNodeConfig config;
+    private final DotConfig dotConfig;
+<span class="fc" id="L69">    private final Set&lt;TableColumn&gt; excludedColumns = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L70">    private final String lineSeparator = System.getProperty(&quot;line.separator&quot;);</span>
+    private final String columnSpan;
+
+    private boolean showImpliedRelationships;
+
+<span class="fc" id="L75">    public DotNode(Table table, boolean fromRoot, DotNodeConfig config, DotConfig dotConfig) {</span>
+<span class="fc" id="L76">        this.table = table;</span>
+<span class="fc" id="L77">        this.config = config;</span>
+<span class="fc" id="L78">        this.dotConfig = dotConfig;</span>
+<span class="fc" id="L79">        this.path = createPath(fromRoot);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        this.columnSpan = config.showColumnDetails ? &quot;COLSPAN=\&quot;2\&quot; &quot; : &quot;COLSPAN=\&quot;3\&quot; &quot;;</span>
+<span class="fc" id="L81">    }</span>
+
+    private String createPath(boolean fromRoot) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (dotConfig.useRelativeLinks()) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            return (table.isRemote() ? &quot;../../../&quot; + FileNameGenerator.generate(table.getContainer()) : &quot;../..&quot;) + TABLES_PATH;</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (fromRoot) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            return (table.isRemote() ? (&quot;../&quot; + FileNameGenerator.generate(table.getContainer()) + TABLES_PATH) : &quot;tables/&quot;);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        return (table.isRemote() ? (&quot;../../&quot; + FileNameGenerator.generate(table.getContainer()) + TABLES_PATH) : &quot;&quot;);</span>
+
+    }
+
+    public void setShowImplied(boolean showImplied) {
+<span class="fc" id="L95">        showImpliedRelationships = showImplied;</span>
+<span class="fc" id="L96">    }</span>
+
+    public Table getTable() {
+<span class="fc" id="L99">        return table;</span>
+    }
+
+    public void excludeColumn(TableColumn column) {
+<span class="nc" id="L103">        excludedColumns.add(column);</span>
+<span class="nc" id="L104">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L108">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L109">        String tableName = table.getName();</span>
+        // fully qualified table name (optionally prefixed with schema)
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        String fqTableName = (table.isRemote() ? table.getContainer() + &quot;.&quot; : &quot;&quot;) + tableName;</span>
+<span class="fc" id="L112">        int maxTitleWidth = getTitleMaxWidth(fqTableName);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        String colspanHeader = config.showColumnDetails ? &quot;COLSPAN=\&quot;4\&quot; &quot; : &quot;COLSPAN=\&quot;3\&quot; &quot;;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        String tableOrView = table.isView() ? &quot;view&quot; : &quot;table&quot;;</span>
+
+<span class="fc" id="L116">        buf.append(&quot;  \&quot;&quot; + fqTableName + &quot;\&quot; [&quot; + lineSeparator);</span>
+<span class="fc" id="L117">        buf.append(&quot;   label=&lt;&quot; + lineSeparator);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        buf.append(&quot;    &lt;TABLE BORDER=\&quot;&quot; + (config.showColumnDetails ? &quot;2&quot; : &quot;0&quot;) + &quot;\&quot; CELLBORDER=\&quot;1\&quot; CELLSPACING=\&quot;0\&quot; BGCOLOR=\&quot;&quot; + CSS.getTableBackground() + &quot;\&quot;&gt;&quot; + lineSeparator);</span>
+<span class="fc" id="L119">        buf.append(INDENT_6 + Html.TR_START);</span>
+<span class="fc" id="L120">        buf.append(&quot;&lt;TD &quot; + colspanHeader + &quot; BGCOLOR=\&quot;&quot; + CSS.getTableHeadBackground() + &quot;\&quot;&gt;&quot;);</span>
+<span class="fc" id="L121">        buf.append(&quot;&lt;TABLE BORDER=\&quot;0\&quot; CELLSPACING=\&quot;0\&quot;&gt;&quot;);</span>
+<span class="fc" id="L122">        buf.append(Html.TR_START);</span>
+<span class="fc" id="L123">        buf.append(&quot;&lt;TD ALIGN=\&quot;LEFT\&quot; FIXEDSIZE=\&quot;TRUE\&quot; WIDTH=\&quot;&quot; + maxTitleWidth + &quot;\&quot; HEIGHT=\&quot;16\&quot;&gt;&lt;B&gt;&quot; + escapeHtml(fqTableName) +&quot;&lt;/B&gt;&quot; + Html.TD_END);</span>
+<span class="fc" id="L124">        buf.append(&quot;&lt;TD ALIGN=\&quot;RIGHT\&quot;&gt;[&quot; + tableOrView + &quot;]&quot; + Html.TD_END);</span>
+<span class="fc" id="L125">        buf.append(Html.TR_END);</span>
+<span class="fc" id="L126">        buf.append(&quot;&lt;/TABLE&gt;&quot;);</span>
+<span class="fc" id="L127">        buf.append(Html.TD_END);</span>
+<span class="fc" id="L128">        buf.append(Html.TR_END + lineSeparator);</span>
+
+<span class="fc" id="L130">        buf.append(columnsToString());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!table.isView()) {</span>
+<span class="fc" id="L132">            buf.append(tableToString());</span>
+        }
+
+<span class="fc" id="L135">        buf.append(&quot;    &lt;/TABLE&gt;&gt;&quot; + lineSeparator);</span>
+<span class="pc bpc" id="L136" title="3 of 4 branches missed.">        if (!table.isRemote() || dotConfig.isOneOfMultipleSchemas()) {</span>
+<span class="fc" id="L137">            buf.append(&quot;    URL=\&quot;&quot; + path + urlEncodeLink(FileNameGenerator.generate(tableName)) + &quot;.html\&quot;&quot; + lineSeparator);</span>
+<span class="fc" id="L138">            buf.append(&quot;    target=\&quot;_top\&quot;&quot; + lineSeparator);</span>
+        }
+<span class="fc" id="L140">        buf.append(&quot;    tooltip=\&quot;&quot; + escapeHtml(fqTableName) + &quot;\&quot;&quot; + lineSeparator);</span>
+<span class="fc" id="L141">        buf.append(&quot;  ];&quot;);</span>
+
+<span class="fc" id="L143">        return buf.toString();</span>
+    }
+
+    private String columnsToString() {
+<span class="fc" id="L147">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L148">        boolean skippedTrivial = false;</span>
+
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (config.showColumns) {</span>
+<span class="fc" id="L151">            Set&lt;TableColumn&gt; indexColumns = getIndexColumns();</span>
+<span class="fc" id="L152">            int maxWidth = getColumnMaxWidth();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (TableColumn column : table.getColumns()) {</span>
+<span class="pc bpc" id="L154" title="1 of 10 branches missed.">                if (config.showTrivialColumns || config.showColumnDetails || column.isPrimary() || column.isForeignKey() || indexColumns.contains(column)) {</span>
+<span class="fc" id="L155">                    buf.append(columnToString(column, indexColumns, maxWidth));</span>
+                } else {
+<span class="fc" id="L157">                    skippedTrivial = true;</span>
+                }
+<span class="fc" id="L159">            }</span>
+        }
+
+<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (skippedTrivial || !config.showColumns) {</span>
+<span class="fc" id="L163">            buf.append(INDENT_6 + Html.TR_START + &quot;&lt;TD PORT=\&quot;elipses\&quot; COLSPAN=\&quot;3\&quot; ALIGN=\&quot;LEFT\&quot;&gt;...&quot; + Html.TD_END + Html.TR_END + lineSeparator);</span>
+        }
+<span class="fc" id="L165">        return buf.toString();</span>
+    }
+
+    private Set&lt;TableColumn&gt; getIndexColumns() {
+<span class="fc" id="L169">        Set&lt;TableColumn&gt; indexColumns = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (TableIndex index : table.getIndexes()) {</span>
+<span class="fc" id="L171">            indexColumns.addAll(index.getColumns());</span>
+<span class="fc" id="L172">        }</span>
+<span class="fc" id="L173">        indexColumns.removeAll(table.getPrimaryColumns());</span>
+<span class="fc" id="L174">        return indexColumns;</span>
+    }
+
+    private int getTitleMaxWidth(String titleTable) {
+<span class="fc" id="L178">        return getTextWidth(titleTable);</span>
+    }
+    
+    private int getColumnMaxWidth() {
+<span class="fc" id="L182">        int maxWidth = getTextWidth(table.getName());</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (TableColumn column : table.getColumns()) {</span>
+<span class="fc" id="L184">            int size = getTextWidth(column.getName());</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (maxWidth &lt; size) {</span>
+<span class="fc" id="L186">                maxWidth = size;</span>
+            }
+<span class="fc" id="L188">        }</span>
+<span class="fc" id="L189">        return maxWidth;</span>
+    }
+
+    private int getTextWidth(String text) {
+<span class="fc" id="L193">        AffineTransform affinetransform = new AffineTransform();</span>
+<span class="fc" id="L194">        FontRenderContext frc = new FontRenderContext(affinetransform, true, true);</span>
+<span class="fc" id="L195">        int fontSize = dotConfig.getFontSize() + 1;</span>
+<span class="fc" id="L196">        Font font = new Font(dotConfig.getFont(), Font.BOLD, fontSize);</span>
+<span class="fc" id="L197">        return (int) (font.getStringBounds(text, frc).getWidth());</span>
+    }
+
+    private String columnToString(TableColumn column, Set&lt;TableColumn&gt; indexColumns, int maxWidth) {
+<span class="fc" id="L201">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L202">        buf.append(INDENT_6 + Html.TR_START);</span>
+<span class="fc" id="L203">        buf.append(&quot;&lt;TD PORT=\&quot;&quot; + escapeHtml(column.getName()) + &quot;\&quot; &quot; + columnSpan);</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (excludedColumns.contains(column))</span>
+<span class="nc" id="L205">            buf.append(&quot;BGCOLOR=\&quot;&quot; + CSS.getExcludedColumnBackgroundColor() + &quot;\&quot; &quot;);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        else if (indexColumns.contains(column))</span>
+<span class="fc" id="L207">            buf.append(&quot;BGCOLOR=\&quot;&quot; + CSS.getIndexedColumnBackground() + &quot;\&quot; &quot;);</span>
+<span class="fc" id="L208">        buf.append(&quot;ALIGN=\&quot;LEFT\&quot;&gt;&quot;);</span>
+<span class="fc" id="L209">        buf.append(&quot;&lt;TABLE BORDER=\&quot;0\&quot; CELLSPACING=\&quot;0\&quot; ALIGN=\&quot;LEFT\&quot;&gt;&quot;);</span>
+<span class="fc" id="L210">        buf.append(&quot;&lt;TR ALIGN=\&quot;LEFT\&quot;&gt;&quot;);</span>
+<span class="fc" id="L211">        buf.append(&quot;&lt;TD ALIGN=\&quot;LEFT\&quot; FIXEDSIZE=\&quot;TRUE\&quot; WIDTH=\&quot;15\&quot; HEIGHT=\&quot;16\&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (column.isPrimary()) {</span>
+<span class="fc" id="L213">            buf.append(&quot;&lt;IMG SRC=\&quot;../../images/primaryKeys.png\&quot;/&gt;&quot;);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        } else if (column.isForeignKey()) {</span>
+<span class="fc" id="L215">            buf.append(&quot;&lt;IMG SRC=\&quot;../../images/foreignKeys.png\&quot;/&gt;&quot;);</span>
+        }
+<span class="fc" id="L217">        buf.append(Html.TD_END);</span>
+<span class="fc" id="L218">        buf.append(&quot;&lt;TD ALIGN=\&quot;LEFT\&quot; FIXEDSIZE=\&quot;TRUE\&quot; WIDTH=\&quot;&quot; + maxWidth + &quot;\&quot; HEIGHT=\&quot;16\&quot;&gt;&quot;);</span>
+<span class="fc" id="L219">        buf.append(escapeHtml(column.getName()));</span>
+<span class="fc" id="L220">        buf.append(Html.TD_END);</span>
+<span class="fc" id="L221">        buf.append(Html.TR_END);</span>
+<span class="fc" id="L222">        buf.append(&quot;&lt;/TABLE&gt;&quot;);</span>
+<span class="fc" id="L223">        buf.append(Html.TD_END);</span>
+
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (config.showColumnDetails) {</span>
+<span class="fc" id="L226">            buf.append(&quot;&lt;TD PORT=\&quot;&quot;);</span>
+<span class="fc" id="L227">            buf.append(escapeHtml(column.getName()));</span>
+<span class="fc" id="L228">            buf.append(&quot;.type\&quot; ALIGN=\&quot;LEFT\&quot;&gt;&quot;);</span>
+<span class="fc" id="L229">            buf.append(escapeHtml(column.getShortTypeName().toLowerCase()));</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">            if (Objects.nonNull(column.getDetailedSize()) &amp;&amp; !column.getDetailedSize().isEmpty()) {</span>
+<span class="fc" id="L231">                buf.append(&quot;[&quot;);</span>
+<span class="fc" id="L232">                buf.append(escapeHtml(column.getDetailedSize()));</span>
+<span class="fc" id="L233">                buf.append(&quot;]&quot;);</span>
+            }
+<span class="fc" id="L235">            buf.append(Html.TD_END);</span>
+        }
+<span class="fc" id="L237">        buf.append(Html.TR_END + lineSeparator);</span>
+<span class="fc" id="L238">        return buf.toString();</span>
+    }
+
+    private String tableToString() {
+<span class="fc" id="L242">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L243">        buf.append(INDENT_6 + Html.TR_START);</span>
+<span class="fc" id="L244">        buf.append(&quot;&lt;TD ALIGN=\&quot;LEFT\&quot; BGCOLOR=\&quot;&quot; + CSS.getBodyBackground() + &quot;\&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        int numParents = showImpliedRelationships ? table.getNumParents() : table.getNumNonImpliedParents();</span>
+<span class="fc bfc" id="L246" title="All 4 branches covered.">        if (numParents &gt; 0 || config.showColumnDetails)</span>
+<span class="fc" id="L247">            buf.append(&quot;&amp;lt; &quot; + numParents);</span>
+        else
+<span class="fc" id="L249">            buf.append(&quot;  &quot;);</span>
+
+<span class="fc" id="L251">        buf.append(Html.TD_END);</span>
+<span class="fc" id="L252">        buf.append(&quot;&lt;TD ALIGN=\&quot;RIGHT\&quot; BGCOLOR=\&quot;&quot; + CSS.getBodyBackground() + &quot;\&quot;&gt;&quot;);</span>
+<span class="fc" id="L253">        final long numRows = table.getNumRows();</span>
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">        if (dotConfig.isNumRowsEnabled() &amp;&amp; numRows &gt;= 0) {</span>
+<span class="fc" id="L255">            buf.append(NumberFormat.getInstance().format(numRows));</span>
+<span class="fc" id="L256">            buf.append(&quot; row&quot;);</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (numRows != 1)</span>
+<span class="fc" id="L258">                buf.append('s');</span>
+        } else {
+<span class="nc" id="L260">            buf.append(&quot;  &quot;);</span>
+        }
+<span class="fc" id="L262">        buf.append(Html.TD_END);</span>
+
+<span class="fc" id="L264">        buf.append(&quot;&lt;TD ALIGN=\&quot;RIGHT\&quot; BGCOLOR=\&quot;&quot; + CSS.getBodyBackground() + &quot;\&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        int numChildren = showImpliedRelationships ? table.getNumChildren() : table.getNumNonImpliedChildren();</span>
+<span class="fc bfc" id="L266" title="All 4 branches covered.">        if (numChildren &gt; 0 || config.showColumnDetails)</span>
+<span class="fc" id="L267">            buf.append(numChildren + &quot; &amp;gt;&quot;);</span>
+        else
+<span class="fc" id="L269">            buf.append(&quot;  &quot;);</span>
+<span class="fc" id="L270">        buf.append(Html.TD_END + Html.TR_END + lineSeparator);</span>
+<span class="fc" id="L271">        return buf.toString();</span>
+    }
+
+    /**
+     * HTML escape the specified string
+     *
+     * @param string
+     * @return
+     */
+    private static String escapeHtml(String string) {
+<span class="fc" id="L281">        return html.escape(string);</span>
+    }
+
+    private static String urlEncodeLink(String string) {
+        try {
+<span class="fc" id="L286">            return URLEncoder.encode(string, StandardCharsets.UTF_8.name()).replace(&quot;+&quot;,&quot;%20&quot;);</span>
+<span class="nc" id="L287">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L288">            LOGGER.error(&quot;Error trying to urlEncode string [{}] with encoding [{}]&quot;, string, StandardCharsets.UTF_8.name(), e);</span>
+<span class="nc" id="L289">            return string;</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DbmsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">DbmsService.java</span></div><h1>DbmsService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.model.DbmsMeta;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+<span class="fc" id="L34">public class DbmsService {</span>
+
+<span class="fc" id="L36">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L38">    private static final Set&lt;String&gt; sql92Keywords = formatSqlKeyWords((&quot;ADA&quot; +</span>
+            &quot;| C | CATALOG_NAME | CHARACTER_SET_CATALOG | CHARACTER_SET_NAME&quot; +
+            &quot;| CHARACTER_SET_SCHEMA | CLASS_ORIGIN | COBOL | COLLATION_CATALOG&quot; +
+            &quot;| COLLATION_NAME | COLLATION_SCHEMA | COLUMN_NAME | COMMAND_FUNCTION | COMMITTED&quot; +
+            &quot;| CONDITION_NUMBER | CONNECTION_NAME | CONSTRAINT_CATALOG | CONSTRAINT_NAME&quot; +
+            &quot;| CONSTRAINT_SCHEMA | CURSOR_NAME&quot; +
+            &quot;| DATA | DATETIME_INTERVAL_CODE | DATETIME_INTERVAL_PRECISION | DYNAMIC_FUNCTION&quot; +
+            &quot;| FORTRAN&quot; +
+            &quot;| LENGTH&quot; +
+            &quot;| MESSAGE_LENGTH | MESSAGE_OCTET_LENGTH | MESSAGE_TEXT | MORE | MUMPS&quot; +
+            &quot;| NAME | NULLABLE | NUMBER&quot; +
+            &quot;| PASCAL | PLI&quot; +
+            &quot;| REPEATABLE | RETURNED_LENGTH | RETURNED_OCTET_LENGTH | RETURNED_SQLSTATE&quot; +
+            &quot;| ROW_COUNT&quot; +
+            &quot;| SCALE | SCHEMA_NAME | SERIALIZABLE | SERVER_NAME | SUBCLASS_ORIGIN&quot; +
+            &quot;| TABLE_NAME | TYPE&quot; +
+            &quot;| UNCOMMITTED | UNNAMED&quot; +
+            &quot;| ABSOLUTE | ACTION | ADD | ALL | ALLOCATE | ALTER | AND&quot; +
+            &quot;| ANY | ARE | AS | ASC&quot; +
+            &quot;| ASSERTION | AT | AUTHORIZATION | AVG&quot; +
+            &quot;| BEGIN | BETWEEN | BIT | BIT_LENGTH | BOTH | BY&quot; +
+            &quot;| CASCADE | CASCADED | CASE | CAST | CATALOG | CHAR | CHARACTER | CHAR_LENGTH&quot; +
+            &quot;| CHARACTER_LENGTH | CHECK | CLOSE | COALESCE | COLLATE | COLLATION&quot; +
+            &quot;| COLUMN | COMMIT | CONNECT | CONNECTION | CONSTRAINT&quot; +
+            &quot;| CONSTRAINTS | CONTINUE&quot; +
+            &quot;| CONVERT | CORRESPONDING | COUNT | CREATE | CROSS | CURRENT&quot; +
+            &quot;| CURRENT_DATE | CURRENT_TIME | CURRENT_TIMESTAMP | CURRENT_USER | CURSOR&quot; +
+            &quot;| DATE | DAY | DEALLOCATE | DEC | DECIMAL | DECLARE | DEFAULT | DEFERRABLE&quot; +
+            &quot;| DEFERRED | DELETE | DESC | DESCRIBE | DESCRIPTOR | DIAGNOSTICS&quot; +
+            &quot;| DISCONNECT | DISTINCT | DOMAIN | DOUBLE | DROP&quot; +
+            &quot;| ELSE | END | END-EXEC | ESCAPE | EXCEPT | EXCEPTION&quot; +
+            &quot;| EXEC | EXECUTE | EXISTS&quot; +
+            &quot;| EXTERNAL | EXTRACT&quot; +
+            &quot;| FALSE | FETCH | FIRST | FLOAT | FOR | FOREIGN | FOUND | FROM | FULL&quot; +
+            &quot;| GET | GLOBAL | GO | GOTO | GRANT | GROUP&quot; +
+            &quot;| HAVING | HOUR&quot; +
+            &quot;| IDENTITY | IMMEDIATE | IN | INDICATOR | INITIALLY | INNER | INPUT&quot; +
+            &quot;| INSENSITIVE | INSERT | INT | INTEGER | INTERSECT | INTERVAL | INTO | IS&quot; +
+            &quot;| ISOLATION&quot; +
+            &quot;| JOIN&quot; +
+            &quot;| KEY&quot; +
+            &quot;| LANGUAGE | LAST | LEADING | LEFT | LEVEL | LIKE | LOCAL | LOWER&quot; +
+            &quot;| MATCH | MAX | MIN | MINUTE | MODULE | MONTH&quot; +
+            &quot;| NAMES | NATIONAL | NATURAL | NCHAR | NEXT | NO | NOT | NULL&quot; +
+            &quot;| NULLIF | NUMERIC&quot; +
+            &quot;| OCTET_LENGTH | OF | ON | ONLY | OPEN | OPTION | OR&quot; +
+            &quot;| ORDER | OUTER&quot; +
+            &quot;| OUTPUT | OVERLAPS&quot; +
+            &quot;| PAD | PARTIAL | POSITION | PRECISION | PREPARE | PRESERVE | PRIMARY&quot; +
+            &quot;| PRIOR | PRIVILEGES | PROCEDURE | PUBLIC&quot; +
+            &quot;| READ | REAL | REFERENCES | RELATIVE | RESTRICT | REVOKE | RIGHT&quot; +
+            &quot;| ROLLBACK | ROWS&quot; +
+            &quot;| SCHEMA | SCROLL | SECOND | SECTION | SELECT | SESSION | SESSION_USER | SET&quot; +
+            &quot;| SIZE | SMALLINT | SOME | SPACE | SQL | SQLCODE | SQLERROR | SQLSTATE&quot; +
+            &quot;| SUBSTRING | SUM | SYSTEM_USER&quot; +
+            &quot;| TABLE | TEMPORARY | THEN | TIME | TIMESTAMP | TIMEZONE_HOUR | TIMEZONE_MINUTE&quot; +
+            &quot;| TO | TRAILING | TRANSACTION | TRANSLATE | TRANSLATION | TRIM | TRUE&quot; +
+            &quot;| UNION | UNIQUE | UNKNOWN | UPDATE | UPPER | USAGE | USER | USING&quot; +
+            &quot;| VALUE | VALUES | VARCHAR | VARYING | VIEW&quot; +
+            &quot;| WHEN | WHENEVER | WHERE | WITH | WORK | WRITE&quot; +
+            &quot;| YEAR&quot; +
+<span class="fc" id="L99">            &quot;| ZONE&quot;).split(&quot;[| ]&quot;));</span>
+
+    public static Set&lt;String&gt; getSql92Keywords() {
+<span class="nc" id="L102">        return Collections.unmodifiableSet(sql92Keywords);</span>
+    }
+
+    public DbmsMeta fetchDbmsMeta(DatabaseMetaData databaseMetaData) {
+<span class="fc" id="L106">        DbmsMeta.Builder builder = new DbmsMeta.Builder();</span>
+
+<span class="fc" id="L108">        onlyLogException(() -&gt; builder.productName(databaseMetaData.getDatabaseProductName()));</span>
+<span class="fc" id="L109">        onlyLogException(() -&gt; builder.productVersion(databaseMetaData.getDatabaseProductVersion()));</span>
+<span class="fc" id="L110">        onlyLogException(() -&gt; builder.sqlKeywords(getSQLKeywords(databaseMetaData)));</span>
+<span class="fc" id="L111">        onlyLogException(() -&gt; builder.systemFunctions(formatSqlKeyWords(databaseMetaData.getSystemFunctions().split(&quot;,&quot;))));</span>
+<span class="fc" id="L112">        onlyLogException(() -&gt; builder.stringFunctions(formatSqlKeyWords(databaseMetaData.getStringFunctions().split(&quot;,&quot;))));</span>
+<span class="fc" id="L113">        onlyLogException(() -&gt; builder.numericFunctions(formatSqlKeyWords(databaseMetaData.getNumericFunctions().split(&quot;,&quot;))));</span>
+<span class="fc" id="L114">        onlyLogException(() -&gt; builder.timeDateFunctions(formatSqlKeyWords(databaseMetaData.getTimeDateFunctions().split(&quot;,&quot;))));</span>
+<span class="fc" id="L115">        onlyLogException(() -&gt; builder.identifierQuoteString(databaseMetaData.getIdentifierQuoteString().trim()));</span>
+
+<span class="fc" id="L117">        return builder.getDbmsMeta();</span>
+    }
+
+    @FunctionalInterface
+    private interface MetaDataFetcher {
+        void fetch() throws SQLException;
+    }
+
+    private static void onlyLogException(MetaDataFetcher fetcher) {
+        try {
+<span class="fc" id="L127">            fetcher.fetch();</span>
+<span class="nc" id="L128">        } catch (SQLException sqle) {</span>
+<span class="nc" id="L129">            LOGGER.warn(&quot;Failed to fetch metadata&quot;, sqle);</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">    }</span>
+
+    private static Set&lt;String&gt; getSQLKeywords(DatabaseMetaData databaseMetaData) throws SQLException {
+<span class="fc" id="L134">        Set&lt;String&gt; allSqlKeywords = new HashSet&lt;&gt;(sql92Keywords);</span>
+<span class="fc" id="L135">        String[] sqlKeywordsArray = databaseMetaData.getSQLKeywords().split(&quot;,&quot;);</span>
+<span class="fc" id="L136">        Set&lt;String&gt; sqlKeywords = formatSqlKeyWords(sqlKeywordsArray);</span>
+<span class="fc" id="L137">        allSqlKeywords.addAll(sqlKeywords);</span>
+<span class="fc" id="L138">        return allSqlKeywords;</span>
+    }
+
+    private static Set&lt;String&gt; formatSqlKeyWords(String[] sqlKeywords) {
+<span class="fc" id="L142">        return Collections.unmodifiableSet(Arrays.stream(sqlKeywords)</span>
+<span class="fc" id="L143">                .map(String::trim)</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                .filter(s -&gt; !s.isEmpty())</span>
+<span class="fc" id="L145">                .map(String::toUpperCase)</span>
+<span class="fc" id="L146">                .collect(Collectors.toSet()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

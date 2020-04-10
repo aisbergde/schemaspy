@@ -1,0 +1,529 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy</a> &gt; <span class="el_source">SchemaAnalyzer.java</span></div><h1>SchemaAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004-2011 John Currier
+ * Copyright (C) 2016, 2017 Rafal Kasa
+ * Copyright (C) 2016, 2017 Ismail Simsek
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.FileFilterUtils;
+import org.apache.commons.io.filefilter.IOFileFilter;
+import org.schemaspy.analyzer.ImpliedConstraintsFinder;
+import org.schemaspy.cli.CommandLineArguments;
+import org.schemaspy.input.dbms.CatalogResolver;
+import org.schemaspy.input.dbms.DbDriverLoader;
+import org.schemaspy.input.dbms.SchemaResolver;
+import org.schemaspy.input.dbms.service.DatabaseService;
+import org.schemaspy.input.dbms.service.SqlService;
+import org.schemaspy.input.dbms.xml.SchemaMeta;
+import org.schemaspy.model.*;
+import org.schemaspy.output.OutputException;
+import org.schemaspy.output.OutputProducer;
+import org.schemaspy.output.diagram.DiagramFactory;
+import org.schemaspy.output.diagram.graphviz.GraphvizDot;
+import org.schemaspy.output.diagram.vizjs.VizJSDot;
+import org.schemaspy.output.dot.DotConfig;
+import org.schemaspy.output.dot.schemaspy.DotFormatter;
+import org.schemaspy.output.html.mustache.diagrams.*;
+import org.schemaspy.output.xml.dom.XmlProducerUsingDOM;
+import org.schemaspy.util.ManifestUtils;
+import org.schemaspy.util.Markdown;
+import org.schemaspy.util.ResourceWriter;
+import org.schemaspy.util.Writers;
+import org.schemaspy.view.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.lang.invoke.MethodHandles;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Wojciech Kasa
+ * @author Thomas Traude
+ * @author Nils Petzaell
+ * @author Daniel Watt
+ */
+public class SchemaAnalyzer {
+<span class="fc" id="L82">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+    private static final int SECONDS_IN_MS = 1000;
+    private static final String DOT_HTML = &quot;.html&quot;;
+    private static final String INDEX_DOT_HTML = &quot;index.html&quot;;
+
+
+    private final SqlService sqlService;
+
+    private final DatabaseService databaseService;
+
+    private final CommandLineArguments commandLineArguments;
+
+<span class="fc" id="L94">    private final List&lt;OutputProducer&gt; outputProducers = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L96">    public SchemaAnalyzer(SqlService sqlService, DatabaseService databaseService, CommandLineArguments commandLineArguments) {</span>
+<span class="fc" id="L97">        this.sqlService = Objects.requireNonNull(sqlService);</span>
+<span class="fc" id="L98">        this.databaseService = Objects.requireNonNull(databaseService);</span>
+<span class="fc" id="L99">        this.commandLineArguments = Objects.requireNonNull(commandLineArguments);</span>
+<span class="fc" id="L100">        addOutputProducer(new XmlProducerUsingDOM());</span>
+<span class="fc" id="L101">    }</span>
+
+    public SchemaAnalyzer addOutputProducer(OutputProducer outputProducer) {
+<span class="fc" id="L104">        outputProducers.add(outputProducer);</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    public Database analyze(Config config) throws SQLException, IOException {
+        // don't render console-based detail unless we're generating HTML (those probably don't have a user watching)
+        // and not already logging fine details (to keep from obfuscating those)
+
+<span class="fc" id="L112">        boolean render = config.isHtmlGenerationEnabled();</span>
+<span class="fc" id="L113">        ProgressListener progressListener = new ConsoleProgressListener(render, commandLineArguments);</span>
+
+        // if -all(evaluteAll) or -schemas given then analyzeMultipleSchemas
+<span class="fc" id="L116">        List&lt;String&gt; schemas = config.getSchemas();</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        if (schemas != null || config.isEvaluateAllEnabled()) {</span>
+<span class="fc" id="L118">            return this.analyzeMultipleSchemas(config, progressListener);</span>
+        } else {
+<span class="fc" id="L120">            File outputDirectory = commandLineArguments.getOutputDirectory();</span>
+<span class="fc" id="L121">            Objects.requireNonNull(outputDirectory);</span>
+<span class="fc" id="L122">            String schema = commandLineArguments.getSchema();</span>
+<span class="fc" id="L123">            return analyze(schema, config, outputDirectory, progressListener);</span>
+        }
+    }
+
+    public Database analyzeMultipleSchemas(Config config, ProgressListener progressListener) throws SQLException, IOException {
+        try {
+            // following params will be replaced by something appropriate
+<span class="fc" id="L130">            List&lt;String&gt; args = config.asList();</span>
+<span class="fc" id="L131">            args.remove(&quot;-schemas&quot;);</span>
+<span class="fc" id="L132">            args.remove(&quot;-schemata&quot;);</span>
+
+<span class="fc" id="L134">            List&lt;String&gt; schemas = config.getSchemas();</span>
+<span class="fc" id="L135">            Database db = null;</span>
+<span class="fc" id="L136">            String schemaSpec = config.getSchemaSpec();</span>
+<span class="fc" id="L137">            Connection connection = getConnection(config);</span>
+<span class="fc" id="L138">            DatabaseMetaData meta = connection.getMetaData();</span>
+            //-all(evaluteAll) given then get list of the database schemas
+<span class="pc bpc" id="L140" title="3 of 4 branches missed.">            if (schemas == null || config.isEvaluateAllEnabled()) {</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                if (schemaSpec == null)</span>
+<span class="nc" id="L142">                    schemaSpec = &quot;.*&quot;;</span>
+<span class="fc" id="L143">                LOGGER.info(</span>
+                        &quot;Analyzing schemas that match regular expression '{}'. &quot; +
+                        &quot;(use -schemaSpec on command line or in .properties to exclude other schemas)&quot;,
+                        schemaSpec);
+<span class="fc" id="L147">                schemas = DbAnalyzer.getPopulatedSchemas(meta, schemaSpec, false);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (schemas.isEmpty())</span>
+<span class="fc" id="L149">                    schemas = DbAnalyzer.getPopulatedSchemas(meta, schemaSpec, true);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                if (schemas.isEmpty())</span>
+<span class="nc" id="L151">                    schemas.add(config.getUser());</span>
+            }
+
+<span class="fc" id="L154">            LOGGER.info(&quot;Analyzing schemas: {}{}&quot;,</span>
+<span class="fc" id="L155">                    System.lineSeparator(),</span>
+<span class="fc" id="L156">                    schemas.stream().map(s -&gt; String.format(&quot;'%s'&quot;, s)).collect(Collectors.joining(System.lineSeparator())));</span>
+
+<span class="fc" id="L158">            String dbName = config.getDb();</span>
+<span class="fc" id="L159">            File outputDir = commandLineArguments.getOutputDirectory();</span>
+            // set flag which later on used for generation rootPathtoHome link.
+<span class="fc" id="L161">            config.setOneOfMultipleSchemas(true);</span>
+
+<span class="fc" id="L163">            List&lt;MustacheSchema&gt; mustacheSchemas = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L164">            MustacheCatalog mustacheCatalog = null;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (String schema : schemas) {</span>
+                // reset -all(evaluteAll) and -schemas parameter to avoid infinite loop! now we are analyzing single schema
+<span class="fc" id="L167">                config.setSchemas(null);</span>
+<span class="fc" id="L168">                config.setEvaluateAllEnabled(false);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (dbName == null)</span>
+<span class="nc" id="L170">                    config.setDb(schema);</span>
+                else
+<span class="fc" id="L172">                    config.setSchema(schema);</span>
+
+<span class="fc" id="L174">                LOGGER.info(&quot;Analyzing '{}'&quot;, schema);</span>
+<span class="fc" id="L175">                File outputDirForSchema = new File(outputDir, FileNameGenerator.generate(schema));</span>
+<span class="fc" id="L176">                db = this.analyze(schema, config, outputDirForSchema, progressListener);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                if (db == null) //if any of analysed schema returns null</span>
+<span class="nc" id="L178">                    return null;</span>
+<span class="fc" id="L179">                mustacheSchemas.add(new MustacheSchema(db.getSchema(), &quot;&quot;));</span>
+<span class="fc" id="L180">                mustacheCatalog = new MustacheCatalog(db.getCatalog(), &quot;&quot;);</span>
+<span class="fc" id="L181">            }</span>
+
+<span class="fc" id="L183">            prepareLayoutFiles(outputDir);</span>
+<span class="fc" id="L184">            MustacheCompiler mustacheCompiler = new MustacheCompiler(dbName, config);</span>
+<span class="fc" id="L185">            HtmlMultipleSchemasIndexPage htmlMultipleSchemasIndexPage = new HtmlMultipleSchemasIndexPage(mustacheCompiler);</span>
+<span class="fc" id="L186">            try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(INDEX_DOT_HTML).toFile())) {</span>
+<span class="fc" id="L187">                htmlMultipleSchemasIndexPage.write(mustacheCatalog, mustacheSchemas, config.getDescription(), getDatabaseProduct(meta), writer);</span>
+            }
+<span class="fc" id="L189">            return db;</span>
+<span class="nc" id="L190">        } catch (Config.MissingRequiredParameterException missingParam) {</span>
+<span class="nc" id="L191">            config.dumpUsage(missingParam.getMessage(), missingParam.isDbTypeSpecific());</span>
+<span class="nc" id="L192">            return null;</span>
+        }
+    }
+
+    /**
+     * Copy / paste from Database, but we can't use Database here...
+     *
+     * @param meta DatabaseMetaData
+     * @return String
+     */
+    private static String getDatabaseProduct(DatabaseMetaData meta) {
+        try {
+<span class="fc" id="L204">            return meta.getDatabaseProductName() + &quot; - &quot; + meta.getDatabaseProductVersion();</span>
+<span class="nc" id="L205">        } catch (SQLException exc) {</span>
+<span class="nc" id="L206">            return &quot;&quot;;</span>
+        }
+    }
+
+    public Database analyze(String schema, Config config, File outputDir, ProgressListener progressListener) throws SQLException, IOException {
+        try {
+<span class="fc" id="L212">            LOGGER.info(&quot;Starting schema analysis&quot;);</span>
+
+<span class="fc" id="L214">            FileUtils.forceMkdir(outputDir);</span>
+
+<span class="fc" id="L216">            String dbName = config.getDb();</span>
+
+<span class="fc" id="L218">            String catalog = commandLineArguments.getCatalog();</span>
+
+<span class="fc" id="L220">            DatabaseMetaData databaseMetaData = sqlService.connect(config);</span>
+<span class="fc" id="L221">            DbmsMeta dbmsMeta = sqlService.getDbmsMeta();</span>
+
+<span class="fc" id="L223">            LOGGER.debug(&quot;supportsSchemasInTableDefinitions: {}&quot;, databaseMetaData.supportsSchemasInTableDefinitions());</span>
+<span class="fc" id="L224">            LOGGER.debug(&quot;supportsCatalogsInTableDefinitions: {}&quot;, databaseMetaData.supportsCatalogsInTableDefinitions());</span>
+
+            // set default Catalog and Schema of the connection
+<span class="fc" id="L227">            catalog = new CatalogResolver(databaseMetaData).resolveCatalog(catalog);</span>
+<span class="fc" id="L228">            schema = new SchemaResolver(databaseMetaData).resolveSchema(schema);</span>
+
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            SchemaMeta schemaMeta = config.getMeta() == null ? null : new SchemaMeta(config.getMeta(), dbName, schema);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (config.isHtmlGenerationEnabled()) {</span>
+<span class="fc" id="L232">                FileUtils.forceMkdir(new File(outputDir, &quot;tables&quot;));</span>
+<span class="fc" id="L233">                FileUtils.forceMkdir(new File(outputDir, &quot;diagrams/summary&quot;));</span>
+
+<span class="fc" id="L235">                LOGGER.info(&quot;Connected to {} - {}&quot;, databaseMetaData.getDatabaseProductName(), databaseMetaData.getDatabaseProductVersion());</span>
+
+<span class="pc bpc" id="L237" title="3 of 4 branches missed.">                if (schemaMeta != null &amp;&amp; schemaMeta.getFile() != null) {</span>
+<span class="nc" id="L238">                    LOGGER.info(&quot;Using additional metadata from {}&quot;, schemaMeta.getFile());</span>
+                }
+            }
+
+            //
+            // create our representation of the database
+            //
+<span class="fc" id="L245">            Database db = new Database(dbmsMeta, dbName, catalog, schema);</span>
+<span class="fc" id="L246">            databaseService.gatherSchemaDetails(config, db, schemaMeta, progressListener);</span>
+
+
+<span class="fc" id="L249">            Collection&lt;Table&gt; tables = new ArrayList&lt;&gt;(db.getTables());</span>
+<span class="fc" id="L250">            tables.addAll(db.getViews());</span>
+
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (tables.isEmpty()) {</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                dumpNoTablesMessage(schema, config.getUser(), databaseMetaData, config.getTableInclusions() != null);</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                if (!config.isOneOfMultipleSchemas()) // don't bail if we're doing the whole enchilada</span>
+<span class="nc" id="L255">                    throw new EmptySchemaException();</span>
+            }
+
+<span class="fc" id="L258">            long duration = progressListener.startedGraphingSummaries();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (config.isHtmlGenerationEnabled()) {</span>
+<span class="fc" id="L260">                generateHtmlDoc(config, commandLineArguments.useVizJS() , progressListener, outputDir, db, duration, tables);</span>
+            }
+
+<span class="fc" id="L263">            outputProducers.forEach(</span>
+                    outputProducer -&gt; {
+                        try {
+<span class="fc" id="L266">                            outputProducer.generate(db, outputDir);</span>
+<span class="nc" id="L267">                        } catch (OutputException oe) {</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                            if (config.isOneOfMultipleSchemas()) {</span>
+<span class="nc" id="L269">                                LOGGER.warn(&quot;Failed to produce output&quot;, oe);</span>
+                            } else {
+<span class="nc" id="L271">                                throw oe;</span>
+                            }
+<span class="fc" id="L273">                        }</span>
+<span class="fc" id="L274">                    });</span>
+
+<span class="fc" id="L276">            List&lt;ForeignKeyConstraint&gt; recursiveConstraints = new ArrayList&lt;&gt;();</span>
+
+            // create an orderer to be able to determine insertion and deletion ordering of tables
+<span class="fc" id="L279">            TableOrderer orderer = new TableOrderer();</span>
+
+            // side effect is that the RI relationships get trashed
+            // also populates the recursiveConstraints collection
+<span class="fc" id="L283">            List&lt;Table&gt; orderedTables = orderer.getTablesOrderedByRI(db.getTables(), recursiveConstraints);</span>
+
+<span class="fc" id="L285">            writeOrders(outputDir, orderedTables);</span>
+
+<span class="fc" id="L287">            duration = progressListener.finishedGatheringDetails();</span>
+<span class="fc" id="L288">            long overallDuration = progressListener.finished(tables, config);</span>
+
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            if (config.isHtmlGenerationEnabled()) {</span>
+<span class="fc" id="L291">                LOGGER.info(&quot;Wrote table details in {} seconds&quot;, duration / SECONDS_IN_MS);</span>
+
+<span class="fc" id="L293">                LOGGER.info(&quot;Wrote relationship details of {} tables/views to directory '{}' in {} seconds.&quot;, tables.size(), outputDir, overallDuration / SECONDS_IN_MS);</span>
+<span class="fc" id="L294">                LOGGER.info(&quot;View the results by opening {}&quot;, new File(outputDir, INDEX_DOT_HTML));</span>
+            }
+
+<span class="fc" id="L297">            return db;</span>
+<span class="nc" id="L298">        } catch (Config.MissingRequiredParameterException missingParam) {</span>
+<span class="nc" id="L299">            config.dumpUsage(missingParam.getMessage(), missingParam.isDbTypeSpecific());</span>
+<span class="nc" id="L300">            return null;</span>
+        }
+    }
+
+    private static void writeOrders(File outputDir, List&lt;Table&gt; orderedTables) throws IOException {
+<span class="fc" id="L305">        try (PrintWriter out = Writers.newPrintWriter(new File(outputDir, &quot;insertionOrder.txt&quot;))) {</span>
+<span class="fc" id="L306">            TextFormatter.getInstance().write(orderedTables, false, out);</span>
+        }
+
+<span class="fc" id="L309">        Collections.reverse(orderedTables);</span>
+<span class="fc" id="L310">        try (PrintWriter out = Writers.newPrintWriter(new File(outputDir, &quot;deletionOrder.txt&quot;))){</span>
+<span class="fc" id="L311">            TextFormatter.getInstance().write(orderedTables, false, out);</span>
+        }
+<span class="fc" id="L313">    }</span>
+
+    private void generateHtmlDoc(Config config, boolean useVizJS, ProgressListener progressListener, File outputDir, Database db, long duration, Collection&lt;Table&gt; tables) throws IOException {
+<span class="fc" id="L316">        LOGGER.info(&quot;Gathered schema details in {} seconds&quot;, duration / SECONDS_IN_MS);</span>
+<span class="fc" id="L317">        LOGGER.info(&quot;Writing/graphing summary&quot;);</span>
+
+<span class="fc" id="L319">        markDownRegistryPages(tables);</span>
+
+<span class="fc" id="L321">        prepareLayoutFiles(outputDir);</span>
+        DiagramFactory diagramFactory;
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (useVizJS) {</span>
+<span class="fc" id="L324">            diagramFactory = new DiagramFactory(new VizJSDot(),outputDir);</span>
+        } else {
+<span class="fc" id="L326">            diagramFactory = new DiagramFactory(new GraphvizDot(config),outputDir);</span>
+        }
+<span class="fc" id="L328">        Path htmlInfoFile = outputDir.toPath().resolve(&quot;info-html.txt&quot;);</span>
+<span class="fc" id="L329">        Files.deleteIfExists(htmlInfoFile);</span>
+<span class="fc" id="L330">        writeInfo(&quot;date&quot;, ZonedDateTime.now().format(DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm:ssZ&quot;)), htmlInfoFile);</span>
+<span class="fc" id="L331">        writeInfo(&quot;os&quot;, System.getProperty(&quot;os.name&quot;) + &quot; &quot; + System.getProperty(&quot;os.version&quot;), htmlInfoFile);</span>
+<span class="fc" id="L332">        writeInfo(&quot;schemaspy-version&quot;, ManifestUtils.getImplementationVersion(), htmlInfoFile);</span>
+<span class="fc" id="L333">        writeInfo(&quot;schemaspy-build&quot;, ManifestUtils.getImplementationBuild(), htmlInfoFile);</span>
+<span class="fc" id="L334">        writeInfo(&quot;diagramImplementation&quot;, diagramFactory.getImplementationDetails(), htmlInfoFile);</span>
+<span class="fc" id="L335">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        boolean showDetailedTables = tables.size() &lt;= config.getMaxDetailedTables();</span>
+<span class="fc" id="L338">        final boolean includeImpliedConstraints = config.isImpliedConstraintsEnabled();</span>
+
+        // if evaluating a 'ruby on rails-based' database then connect the columns
+        // based on RoR conventions
+        // note that this is done before 'hasRealRelationships' gets evaluated so
+        // we get a relationships ER diagram
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (config.isRailsEnabled())</span>
+<span class="nc" id="L345">            DbAnalyzer.getRailsConstraints(db.getTablesMap());</span>
+<span class="fc" id="L346">        DotConfig dotConfig = new DotConfigUsingConfig(config, &quot;svg&quot;.equalsIgnoreCase(diagramFactory.getDiagramFormat()));</span>
+<span class="fc" id="L347">        DotFormatter dotProducer = new DotFormatter(dotConfig);</span>
+<span class="fc" id="L348">        MustacheDiagramFactory mustacheDiagramFactory = new MustacheDiagramFactory(diagramFactory);</span>
+<span class="fc" id="L349">        ImpliedConstraintsFinder impliedConstraintsFinder = new ImpliedConstraintsFinder();</span>
+<span class="fc" id="L350">        MustacheSummaryDiagramFactory mustacheSummaryDiagramFactory = new MustacheSummaryDiagramFactory(dotProducer, mustacheDiagramFactory, impliedConstraintsFinder, outputDir);</span>
+<span class="fc" id="L351">        MustacheSummaryDiagramResults results = mustacheSummaryDiagramFactory.generateSummaryDiagrams(db, tables, includeImpliedConstraints, showDetailedTables, progressListener);</span>
+<span class="fc" id="L352">        results.getOutputExceptions().stream().forEachOrdered(exception -&gt;</span>
+<span class="nc" id="L353">                LOGGER.error(&quot;RelationShipDiagramError&quot;, exception)</span>
+        );
+<span class="fc" id="L355">        MustacheCompiler mustacheCompiler = new MustacheCompiler(db.getName(), config);</span>
+
+<span class="fc" id="L357">        HtmlRelationshipsPage htmlRelationshipsPage = new HtmlRelationshipsPage(mustacheCompiler);</span>
+<span class="fc" id="L358">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;relationships.html&quot;).toFile())) {</span>
+<span class="fc" id="L359">            htmlRelationshipsPage.write(results, writer);</span>
+        }
+
+<span class="fc" id="L362">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="fc" id="L364">        List&lt;Table&gt; orphans = DbAnalyzer.getOrphans(tables);</span>
+<span class="fc" id="L365">        MustacheOrphanDiagramFactory mustacheOrphanDiagramFactory = new MustacheOrphanDiagramFactory(dotProducer, mustacheDiagramFactory, outputDir);</span>
+<span class="fc" id="L366">        List&lt;MustacheTableDiagram&gt; orphanDiagrams = mustacheOrphanDiagramFactory.generateOrphanDiagrams(orphans);</span>
+<span class="fc" id="L367">        HtmlOrphansPage htmlOrphansPage = new HtmlOrphansPage(mustacheCompiler);</span>
+<span class="fc" id="L368">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;orphans.html&quot;).toFile())) {</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            htmlOrphansPage.write(orphanDiagrams, orphanDiagrams.size() == orphans.size(), writer);</span>
+        }
+
+<span class="fc" id="L372">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="fc" id="L374">        HtmlMainIndexPage htmlMainIndexPage = new HtmlMainIndexPage(mustacheCompiler, config.getDescription());</span>
+<span class="fc" id="L375">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(INDEX_DOT_HTML).toFile())) {</span>
+<span class="fc" id="L376">            htmlMainIndexPage.write(db, tables, results.getImpliedConstraints(), writer);</span>
+        }
+
+<span class="fc" id="L379">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="fc" id="L381">        List&lt;ForeignKeyConstraint&gt; constraints = DbAnalyzer.getForeignKeyConstraints(tables);</span>
+
+<span class="fc" id="L383">        HtmlConstraintsPage htmlConstraintsPage = new HtmlConstraintsPage(mustacheCompiler);</span>
+<span class="fc" id="L384">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;constraints.html&quot;).toFile())) {</span>
+<span class="fc" id="L385">            htmlConstraintsPage.write(constraints, tables, writer);</span>
+        }
+
+<span class="fc" id="L388">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="fc" id="L390">        HtmlAnomaliesPage htmlAnomaliesPage = new HtmlAnomaliesPage(mustacheCompiler);</span>
+<span class="fc" id="L391">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;anomalies.html&quot;).toFile())) {</span>
+<span class="fc" id="L392">            htmlAnomaliesPage.write(tables, results.getImpliedConstraints(), writer);</span>
+        }
+
+<span class="fc" id="L395">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="fc" id="L397">        HtmlColumnsPage htmlColumnsPage = new HtmlColumnsPage(mustacheCompiler);</span>
+<span class="fc" id="L398">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;columns.html&quot;).toFile())) {</span>
+<span class="fc" id="L399">            htmlColumnsPage.write(tables, writer);</span>
+        }
+
+<span class="fc" id="L402">        progressListener.graphingSummaryProgressed();</span>
+
+<span class="fc" id="L404">        HtmlRoutinesPage htmlRoutinesPage = new HtmlRoutinesPage(mustacheCompiler);</span>
+<span class="fc" id="L405">        try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;routines.html&quot;).toFile())) {</span>
+<span class="fc" id="L406">            htmlRoutinesPage.write(db.getRoutines(), writer);</span>
+        }
+
+<span class="fc" id="L409">        HtmlRoutinePage htmlRoutinePage = new HtmlRoutinePage(mustacheCompiler);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        for (Routine routine : db.getRoutines()) {</span>
+<span class="fc" id="L411">            try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;routines&quot;).resolve(FileNameGenerator.generate(routine.getName()) + DOT_HTML).toFile())) {</span>
+<span class="fc" id="L412">                htmlRoutinePage.write(routine, writer);</span>
+            }
+<span class="fc" id="L414">        }</span>
+
+        // create detailed diagrams
+
+<span class="fc" id="L418">        duration = progressListener.startedGraphingDetails();</span>
+
+<span class="fc" id="L420">        LOGGER.info(&quot;Completed summary in {} seconds&quot;, duration / SECONDS_IN_MS);</span>
+<span class="fc" id="L421">        LOGGER.info(&quot;Writing/diagramming details&quot;);</span>
+<span class="fc" id="L422">        SqlAnalyzer sqlAnalyzer = new SqlAnalyzer(db.getDbmsMeta().getIdentifierQuoteString(), db.getDbmsMeta().getAllKeywords(), db.getTables(), db.getViews());</span>
+<span class="fc" id="L423">        MustacheTableDiagramFactory mustacheTableDiagramFactory = new MustacheTableDiagramFactory(dotProducer, mustacheDiagramFactory, outputDir, commandLineArguments.getDegreeOfSeparation());</span>
+<span class="fc" id="L424">        HtmlTablePage htmlTablePage = new HtmlTablePage(mustacheCompiler, sqlAnalyzer);</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        for (Table table : tables) {</span>
+<span class="fc" id="L426">            List&lt;MustacheTableDiagram&gt; mustacheTableDiagrams = mustacheTableDiagramFactory.generateTableDiagrams(table, results.getStats());</span>
+<span class="fc" id="L427">            progressListener.graphingDetailsProgressed(table);</span>
+<span class="fc" id="L428">            LOGGER.debug(&quot;Writing details of {}&quot;, table.getName());</span>
+<span class="fc" id="L429">            try (Writer writer = Writers.newPrintWriter(outputDir.toPath().resolve(&quot;tables&quot;).resolve(FileNameGenerator.generate(table.getName()) + DOT_HTML).toFile())) {</span>
+<span class="fc" id="L430">                htmlTablePage.write(table, mustacheTableDiagrams, writer);</span>
+            }
+<span class="fc" id="L432">        }</span>
+<span class="fc" id="L433">    }</span>
+
+    private static void markDownRegistryPages(Collection&lt;Table&gt; tables) {
+<span class="fc" id="L436">        tables.stream()</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">                .filter(table -&gt; !table.isLogical())</span>
+<span class="fc" id="L438">                .forEach( table -&gt; {</span>
+<span class="fc" id="L439">                    String tablePath = &quot;tables/&quot; + FileNameGenerator.generate(table.getName()) + DOT_HTML;</span>
+<span class="fc" id="L440">                    Markdown.registryPage(table.getName(), tablePath);</span>
+<span class="fc" id="L441">                });</span>
+<span class="fc" id="L442">    }</span>
+
+    /**
+     * This method is responsible to copy layout folder to destination directory and not copy template .html files
+     *
+     * @param outputDir File
+     * @throws IOException when not possible to copy layout files to outputDir
+     */
+    private static void prepareLayoutFiles(File outputDir) throws IOException {
+<span class="fc" id="L451">        URL url = null;</span>
+<span class="fc" id="L452">        Enumeration&lt;URL&gt; possibleResources = SchemaAnalyzer.class.getClassLoader().getResources(&quot;layout&quot;);</span>
+<span class="pc bpc" id="L453" title="1 of 4 branches missed.">        while (possibleResources.hasMoreElements() &amp;&amp; Objects.isNull(url)) {</span>
+<span class="fc" id="L454">            URL possibleResource = possibleResources.nextElement();</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            if (!possibleResource.getPath().contains(&quot;test-classes&quot;)) {</span>
+<span class="fc" id="L456">                url = possibleResource;</span>
+            }
+<span class="fc" id="L458">        }</span>
+
+<span class="fc" id="L460">        IOFileFilter notHtmlFilter = FileFilterUtils.notFileFilter(FileFilterUtils.suffixFileFilter(DOT_HTML));</span>
+<span class="fc" id="L461">        FileFilter filter = FileFilterUtils.and(notHtmlFilter);</span>
+<span class="fc" id="L462">        ResourceWriter.copyResources(url, outputDir, filter);</span>
+<span class="fc" id="L463">    }</span>
+
+    private static void writeInfo(String key, String value, Path infoFile) {
+        try {
+<span class="fc" id="L467">            Files.write(infoFile, (key + &quot;=&quot; + value + &quot;\n&quot;).getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND, StandardOpenOption.WRITE);</span>
+<span class="nc" id="L468">        } catch (IOException e) {</span>
+<span class="nc" id="L469">            LOGGER.error(&quot;Failed to write '{}', to '{}'&quot;, key + &quot;=&quot; + value, infoFile, e);</span>
+<span class="fc" id="L470">        }</span>
+<span class="fc" id="L471">    }</span>
+
+    private static Connection getConnection(Config config) throws IOException {
+<span class="fc" id="L474">        DbDriverLoader driverLoader = new DbDriverLoader();</span>
+<span class="fc" id="L475">        return driverLoader.getConnection(config);</span>
+    }
+
+    /**
+     * dumpNoDataMessage
+     *
+     * @param schema String
+     * @param user   String
+     * @param meta   DatabaseMetaData
+     */
+    private static void dumpNoTablesMessage(String schema, String user, DatabaseMetaData meta, boolean specifiedInclusions) throws SQLException {
+<span class="fc" id="L486">        LOGGER.warn(&quot;No tables or views were found in schema '{}'.&quot;, schema);</span>
+        List&lt;String&gt; schemas;
+        try {
+<span class="fc" id="L489">            schemas = DbAnalyzer.getSchemas(meta);</span>
+<span class="nc" id="L490">        } catch (SQLException | RuntimeException exc) {</span>
+<span class="nc" id="L491">            LOGGER.error(&quot;The user you specified '{}' might not have rights to read the database metadata.&quot;, user, exc);</span>
+<span class="nc" id="L492">            return;</span>
+<span class="fc" id="L493">        }</span>
+
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        if (Objects.isNull(schemas)) {</span>
+<span class="nc" id="L496">            LOGGER.error(&quot;Failed to retrieve any schemas&quot;);</span>
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">        } else if (schemas.contains(schema)) {</span>
+<span class="nc" id="L498">            LOGGER.error(</span>
+                    &quot;The schema exists in the database, but the user you specified '{}'&quot; +
+                    &quot;might not have rights to read its contents.&quot;,
+                    user);
+<span class="nc bnc" id="L502" title="All 2 branches missed.">            if (specifiedInclusions) {</span>
+<span class="nc" id="L503">                LOGGER.error(</span>
+                        &quot;Another possibility is that the regular expression that you specified &quot; +
+                        &quot;for what to include (via -i) didn't match any tables.&quot;);
+            }
+        } else {
+<span class="fc" id="L508">            LOGGER.error(</span>
+                    &quot;The schema '{}' could not be read/found, schema is specified using the -s option.&quot; +
+                    &quot;Make sure user '{}' has the correct privileges to read the schema.&quot; +
+                    &quot;Also not that schema names are usually case sensitive.&quot;,
+                    schema, user);
+<span class="fc" id="L513">            LOGGER.info(</span>
+                    &quot;Available schemas(Some of these may be user or system schemas):{}{}&quot;,
+<span class="fc" id="L515">                    System.lineSeparator(),</span>
+<span class="fc" id="L516">                    schemas.stream().collect(Collectors.joining(System.lineSeparator())));</span>
+<span class="fc" id="L517">            List&lt;String&gt; populatedSchemas = DbAnalyzer.getPopulatedSchemas(meta);</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            if (populatedSchemas.isEmpty()) {</span>
+<span class="fc" id="L519">                LOGGER.error(&quot;Unable to determine if any of the schemas contain tables/views&quot;);</span>
+            } else {
+<span class="nc" id="L521">                LOGGER.info(&quot;Schemas with tables/views visible to '{}':{}{}&quot;,</span>
+                        user,
+<span class="nc" id="L523">                        System.lineSeparator(),</span>
+<span class="nc" id="L524">                        populatedSchemas.stream().map(s -&gt; String.format(&quot;'%s'&quot;, s)).collect(Collectors.joining(System.lineSeparator())));</span>
+            }
+        }
+<span class="fc" id="L527">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

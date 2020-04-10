@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResourceWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.util</a> &gt; <span class="el_source">ResourceWriter.java</span></div><h1>ResourceWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.util;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.lang.invoke.MethodHandles;
+import java.net.JarURLConnection;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+
+/**
+ * @author john Currier
+ * @author Rafal Kasa
+ * @author Thomas Traude
+ * @author Daniel Watt
+ */
+public class ResourceWriter {
+<span class="nc" id="L46">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private ResourceWriter() {}
+
+    /**
+     * Copies resources to target folder.
+     *
+     * @param resourceUrl
+     * @param targetPath
+     * @return
+     */
+    public static void copyResources(URL resourceUrl, File targetPath, FileFilter filter) throws IOException {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (resourceUrl == null) {</span>
+<span class="nc" id="L59">            return;</span>
+        }
+
+<span class="nc" id="L62">        URLConnection urlConnection = resourceUrl.openConnection();</span>
+
+        /**
+         * Copy resources either from inside jar or from project folder.
+         */
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (urlConnection instanceof JarURLConnection) {</span>
+<span class="nc" id="L68">            copyJarResourceToPath((JarURLConnection) urlConnection, targetPath, filter);</span>
+        } else {
+<span class="nc" id="L70">            File file = new File(resourceUrl.getPath());</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (file.isDirectory()) {</span>
+<span class="nc" id="L72">                FileUtils.copyDirectory(file, targetPath, filter);</span>
+            } else {
+<span class="nc" id="L74">                FileUtils.copyFile(file, targetPath);</span>
+            }
+        }
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * Copies resources from the jar file of the current thread and extract it
+     * to the destination path.
+     *
+     * @param jarConnection
+     * @param destPath destination file or directory
+     */
+    private static void copyJarResourceToPath(JarURLConnection jarConnection, File destPath, FileFilter filter) {
+        try {
+<span class="nc" id="L88">            JarFile jarFile = jarConnection.getJarFile();</span>
+<span class="nc" id="L89">            String jarConnectionEntryName = jarConnection.getEntryName();</span>
+
+            /**
+             * Iterate all entries in the jar file.
+             */
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            for (Enumeration&lt;JarEntry&gt; e = jarFile.entries(); e.hasMoreElements();) {</span>
+<span class="nc" id="L95">                JarEntry jarEntry = e.nextElement(); //NOSONAR</span>
+<span class="nc" id="L96">                String jarEntryName = jarEntry.getName();</span>
+
+                /**
+                 * Extract files only if they match the path.
+                 */
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (jarEntryName.startsWith(jarConnectionEntryName + &quot;/&quot;)) {</span>
+<span class="nc" id="L102">                    String filename = jarEntryName.substring(jarConnectionEntryName.length());</span>
+<span class="nc" id="L103">                    File currentFile = new File(destPath, filename);</span>
+
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                    if (jarEntry.isDirectory()) {</span>
+<span class="nc" id="L107">                        FileUtils.forceMkdir(currentFile);</span>
+                    } else {
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                        if (filter == null || filter.accept(currentFile)) {</span>
+<span class="nc" id="L110">                            InputStream is = jarFile.getInputStream(jarEntry);</span>
+<span class="nc" id="L111">                            OutputStream out = FileUtils.openOutputStream(currentFile);</span>
+<span class="nc" id="L112">                            IOUtils.copy(is, out);</span>
+<span class="nc" id="L113">                            is.close();</span>
+<span class="nc" id="L114">                            out.close();</span>
+                        }
+                    }
+                }
+<span class="nc" id="L118">            }</span>
+<span class="nc" id="L119">        } catch (IOException e) {</span>
+<span class="nc" id="L120">            LOGGER.warn(e.getMessage(),e);</span>
+<span class="nc" id="L121">        }</span>
+<span class="nc" id="L122">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

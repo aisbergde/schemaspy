@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MustacheSummaryDiagramFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.html.mustache.diagrams</a> &gt; <span class="el_source">MustacheSummaryDiagramFactory.java</span></div><h1>MustacheSummaryDiagramFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.output.html.mustache.diagrams;
+
+import org.schemaspy.analyzer.ImpliedConstraintsFinder;
+import org.schemaspy.model.Database;
+import org.schemaspy.model.ImpliedForeignKeyConstraint;
+import org.schemaspy.model.ProgressListener;
+import org.schemaspy.model.Table;
+import org.schemaspy.output.OutputException;
+import org.schemaspy.output.diagram.DiagramException;
+import org.schemaspy.output.dot.schemaspy.DotFormatter;
+import org.schemaspy.util.Writers;
+import org.schemaspy.view.MustacheTableDiagram;
+import org.schemaspy.view.WriteStats;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+/**
+ * @author Nils Petzaell
+ */
+public class MustacheSummaryDiagramFactory {
+
+    private static final String FILE_PREFIX = &quot;relationships&quot;;
+    private static final String FAILED_DOT = &quot;Failed to produce dot: &quot;;
+    private static final String FAILED_DIAGRAM = &quot;Failed to produce diagram for: &quot;;
+
+    private final DotFormatter dotProducer;
+    private final MustacheDiagramFactory mustacheDiagramFactory;
+    private final ImpliedConstraintsFinder impliedConstraintsFinder;
+    private final Path summaryDir;
+
+<span class="fc" id="L56">    public MustacheSummaryDiagramFactory(DotFormatter dotProducer, MustacheDiagramFactory mustacheDiagramFactory, ImpliedConstraintsFinder impliedConstraintsFinder, File outputDir) {</span>
+<span class="fc" id="L57">        this.dotProducer = dotProducer;</span>
+<span class="fc" id="L58">        this.mustacheDiagramFactory = mustacheDiagramFactory;</span>
+<span class="fc" id="L59">        this.impliedConstraintsFinder = impliedConstraintsFinder;</span>
+<span class="fc" id="L60">        this.summaryDir = outputDir.toPath().resolve(&quot;diagrams&quot;).resolve(&quot;summary&quot;);</span>
+<span class="fc" id="L61">    }</span>
+
+    public MustacheSummaryDiagramResults generateSummaryDiagrams(
+            Database database,
+            Collection&lt;Table&gt; tables,
+            boolean includeImpliedConstraints,
+            boolean showDetailedTables,
+            ProgressListener progressListener
+    ) throws IOException {
+<span class="fc" id="L70">        Files.createDirectories(summaryDir);</span>
+<span class="fc" id="L71">        List&lt;MustacheTableDiagram&gt; diagrams = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L72">        List&lt;OutputException&gt; outputExceptions = new ArrayList&lt;&gt;();</span>
+        // generate the compact form of the relationships .dot file
+
+<span class="fc" id="L75">        WriteStats stats = new WriteStats(tables);</span>
+<span class="fc" id="L76">        File realCompactDot = summaryDir.resolve(FILE_PREFIX + &quot;.real.compact.dot&quot;).toFile();</span>
+<span class="fc" id="L77">        try (PrintWriter out = Writers.newPrintWriter(realCompactDot)) {</span>
+<span class="fc" id="L78">            dotProducer.writeSummaryRealRelationships(database, tables, true, showDetailedTables, stats, out);</span>
+<span class="fc" id="L79">        } catch (IOException ioexception) {</span>
+<span class="fc" id="L80">            outputExceptions.add(new OutputException(FAILED_DOT + realCompactDot.toString(), ioexception));</span>
+<span class="fc" id="L81">        }</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        boolean hasRealRelationships = stats.getNumTablesWritten() &gt; 0 || stats.getNumViewsWritten() &gt; 0;</span>
+
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (hasRealRelationships) {</span>
+            try {
+<span class="fc" id="L87">                MustacheTableDiagram realCompactDiagram = mustacheDiagramFactory.generateSummaryDiagram(&quot;Compact&quot;, realCompactDot, FILE_PREFIX + &quot;.real.compact&quot;);</span>
+<span class="fc" id="L88">                realCompactDiagram.setActive(true);</span>
+<span class="fc" id="L89">                diagrams.add(realCompactDiagram);</span>
+<span class="nc" id="L90">            } catch (DiagramException diagramException) {</span>
+<span class="nc" id="L91">                outputExceptions.add(new OutputException(FAILED_DIAGRAM + realCompactDot.toString(), diagramException));</span>
+<span class="fc" id="L92">            }</span>
+            // real relationships exist so generate the 'big' form of the relationships .dot file
+<span class="fc" id="L94">            generateRealLarge(database, tables, showDetailedTables, diagrams, outputExceptions, stats);</span>
+        } else {
+<span class="fc" id="L96">            Files.deleteIfExists(realCompactDot.toPath());</span>
+        }
+
+        // getting implied constraints has a side-effect of associating the parent/child tables, so don't do it
+        // here unless they want that behavior
+<span class="fc" id="L101">        List&lt;ImpliedForeignKeyConstraint&gt; impliedConstraints = new ArrayList();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (includeImpliedConstraints)</span>
+<span class="fc" id="L103">            impliedConstraints.addAll(impliedConstraintsFinder.find(tables));</span>
+
+<span class="fc" id="L105">        progressListener.graphingSummaryProgressed();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!impliedConstraints.isEmpty()) {</span>
+<span class="fc" id="L107">            generateImpliedCompact(database, tables, showDetailedTables, diagrams, outputExceptions, stats);</span>
+<span class="fc" id="L108">            generateImpliedLarge(database, tables, showDetailedTables, diagrams, outputExceptions, stats);</span>
+        }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (!diagrams.isEmpty()) {</span>
+<span class="fc" id="L111">            diagrams.get(0).setActive(true);</span>
+        }
+<span class="fc" id="L113">        return new MustacheSummaryDiagramResults(diagrams, stats, hasRealRelationships, impliedConstraints, outputExceptions);</span>
+    }
+
+    private void generateRealLarge(Database database, Collection&lt;Table&gt; tables, boolean showDetailedTables, List&lt;MustacheTableDiagram&gt; diagrams, List&lt;OutputException&gt; outputExceptions, WriteStats stats) {
+<span class="fc" id="L117">        File realLargeDot = summaryDir.resolve(FILE_PREFIX + &quot;.real.large.dot&quot;).toFile();</span>
+<span class="fc" id="L118">        try (PrintWriter out = Writers.newPrintWriter(realLargeDot)) {</span>
+<span class="fc" id="L119">            dotProducer.writeSummaryRealRelationships(database, tables, false, showDetailedTables, stats, out);</span>
+<span class="fc" id="L120">            MustacheTableDiagram realLargeDiagram = mustacheDiagramFactory.generateSummaryDiagram(&quot;Large&quot;, realLargeDot, FILE_PREFIX + &quot;.real.large&quot;);</span>
+<span class="fc" id="L121">            diagrams.add(realLargeDiagram);</span>
+<span class="nc" id="L122">        } catch (IOException ioexception) {</span>
+<span class="nc" id="L123">            outputExceptions.add(new OutputException(FAILED_DOT + realLargeDot.toString(), ioexception));</span>
+<span class="nc" id="L124">        } catch (DiagramException diagramException) {</span>
+<span class="nc" id="L125">            outputExceptions.add(new OutputException(FAILED_DIAGRAM + realLargeDot.toString(), diagramException));</span>
+<span class="pc" id="L126">        }</span>
+<span class="fc" id="L127">    }</span>
+
+    private void generateImpliedCompact(Database database, Collection&lt;Table&gt; tables, boolean showDetailedTables, List&lt;MustacheTableDiagram&gt; diagrams, List&lt;OutputException&gt; outputExceptions, WriteStats stats) {
+<span class="fc" id="L130">        File impliedCompactDot = summaryDir.resolve(FILE_PREFIX + &quot;.implied.compact.dot&quot;).toFile();</span>
+<span class="fc" id="L131">        try (PrintWriter out = Writers.newPrintWriter(impliedCompactDot)) {</span>
+<span class="fc" id="L132">            dotProducer.writeSummaryAllRelationships(database, tables, true, showDetailedTables, stats, out);</span>
+<span class="fc" id="L133">            MustacheTableDiagram impliedCompactDiagram = mustacheDiagramFactory.generateSummaryDiagram(&quot;Compact Implied&quot;, impliedCompactDot, FILE_PREFIX + &quot;.implied.compact&quot;);</span>
+<span class="fc" id="L134">            impliedCompactDiagram.setIsImplied(true);</span>
+<span class="fc" id="L135">            diagrams.add(impliedCompactDiagram);</span>
+<span class="fc" id="L136">        } catch (IOException ioexception) {</span>
+<span class="fc" id="L137">            outputExceptions.add(new OutputException(FAILED_DOT + impliedCompactDot.toString(), ioexception));</span>
+<span class="nc" id="L138">        } catch (DiagramException diagramException) {</span>
+<span class="nc" id="L139">            outputExceptions.add(new OutputException(FAILED_DIAGRAM + impliedCompactDot.toString(), diagramException));</span>
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">    }</span>
+
+    private void generateImpliedLarge(Database database, Collection&lt;Table&gt; tables, boolean showDetailedTables, List&lt;MustacheTableDiagram&gt; diagrams, List&lt;OutputException&gt; outputExceptions, WriteStats stats) {
+<span class="fc" id="L144">        File impliedLargeDot = summaryDir.resolve(FILE_PREFIX + &quot;.implied.large.dot&quot;).toFile();</span>
+<span class="fc" id="L145">        try (PrintWriter out = Writers.newPrintWriter(impliedLargeDot)) {</span>
+<span class="fc" id="L146">            dotProducer.writeSummaryAllRelationships(database, tables, false, showDetailedTables, stats, out);</span>
+<span class="fc" id="L147">            MustacheTableDiagram impliedLargeDiagram = mustacheDiagramFactory.generateSummaryDiagram(&quot;Large Implied&quot;, impliedLargeDot, FILE_PREFIX + &quot;.implied.large&quot;);</span>
+<span class="fc" id="L148">            impliedLargeDiagram.setIsImplied(true);</span>
+<span class="fc" id="L149">            diagrams.add(impliedLargeDiagram);</span>
+<span class="fc" id="L150">        } catch (IOException ioexception) {</span>
+<span class="fc" id="L151">            outputExceptions.add(new OutputException(FAILED_DOT + impliedLargeDot.toString(), ioexception));</span>
+<span class="nc" id="L152">        } catch (DiagramException diagramException) {</span>
+<span class="nc" id="L153">            outputExceptions.add(new OutputException(FAILED_DIAGRAM + impliedLargeDot.toString(), diagramException));</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

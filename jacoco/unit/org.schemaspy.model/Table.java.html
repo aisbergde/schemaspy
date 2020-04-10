@@ -1,0 +1,725 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Table.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">Table.java</span></div><h1>Table.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import org.schemaspy.input.dbms.xml.TableColumnMeta;
+import org.schemaspy.input.dbms.xml.TableMeta;
+import org.schemaspy.util.CaseInsensitiveMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.util.*;
+
+/**
+ * A &lt;code&gt;Table&lt;/code&gt; is one of the basic building blocks of SchemaSpy
+ * that knows everything about the database table's metadata.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class Table implements Comparable&lt;Table&gt; {
+    private final String catalog;
+    private final String schema;
+    private final String name;
+    private final String fullName;
+    private final String container;
+<span class="fc" id="L51">    protected CaseInsensitiveMap&lt;TableColumn&gt; columns = new CaseInsensitiveMap&lt;&gt;();</span>
+<span class="fc" id="L52">    private final List&lt;TableColumn&gt; primaryKeys = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L53">    private final CaseInsensitiveMap&lt;ForeignKeyConstraint&gt; foreignKeys = new CaseInsensitiveMap&lt;&gt;();</span>
+<span class="fc" id="L54">    private final CaseInsensitiveMap&lt;TableIndex&gt; indexes = new CaseInsensitiveMap&lt;&gt;();</span>
+    private Object id;
+<span class="fc" id="L56">    private final Map&lt;String, String&gt; checkConstraints = new TreeMap&lt;&gt;(String.CASE_INSENSITIVE_ORDER);</span>
+    private long numRows;
+    protected final Database db;
+    private String comments;
+    private int maxChildren;
+    private int maxParents;
+
+<span class="fc" id="L63">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    /**
+     * Construct a table that knows everything about the database table's metadata
+     *
+     * @param db
+     * @param catalog
+     * @param schema
+     * @param name
+     * @param comments
+     */
+<span class="fc" id="L74">    public Table(Database db, String catalog, String schema, String name, String comments) {</span>
+<span class="fc" id="L75">        this.db = db;</span>
+<span class="fc" id="L76">        this.catalog = catalog;</span>
+<span class="fc" id="L77">        this.schema = schema;</span>
+<span class="fc" id="L78">        this.container = Optional.ofNullable(schema).orElse(Optional.ofNullable(catalog).orElse(db.getName()));</span>
+<span class="fc" id="L79">        this.name = name;</span>
+<span class="fc" id="L80">        this.fullName = getFullName(db.getName(), catalog, schema, name);</span>
+<span class="fc" id="L81">        LOGGER.debug(&quot;Creating {} {}&quot;, getClass().getSimpleName(), fullName);</span>
+
+<span class="fc" id="L83">        setComments(comments);</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * Get the foreign keys associated with this table
+     *
+     * @return
+     */
+    public Collection&lt;ForeignKeyConstraint&gt; getForeignKeys() {
+<span class="fc" id="L92">        return Collections.unmodifiableCollection(foreignKeys.values());</span>
+    }
+
+    /**
+     * Get the foreign keys associated with this table
+     *
+     * @return
+     */
+    public CaseInsensitiveMap&lt;ForeignKeyConstraint&gt; getForeignKeysMap() {
+<span class="fc" id="L101">        return foreignKeys;</span>
+    }
+
+    /**
+     * Add a check constraint to the table
+     * (no real details, just name and textual representation)
+     *
+     * @param constraintName
+     * @param text
+     */
+    public void addCheckConstraint(String constraintName, String text) {
+<span class="fc" id="L112">        checkConstraints.put(constraintName, text);</span>
+<span class="fc" id="L113">    }</span>
+
+    /**
+     * @param primaryColumn
+     */
+    public void setPrimaryColumn(TableColumn primaryColumn) {
+<span class="fc" id="L119">        primaryKeys.add(primaryColumn);</span>
+<span class="fc" id="L120">    }</span>
+
+    /**
+     * Add a column that's defined in xml metadata.
+     * Assumes that a column named colMeta.getName() doesn't already exist in &lt;code&gt;columns&lt;/code&gt;.
+     *
+     * @param colMeta
+     * @return
+     */
+    protected TableColumn addColumn(TableColumnMeta colMeta) {
+<span class="nc" id="L130">        TableColumn column = new TableColumn(this, colMeta);</span>
+
+<span class="nc" id="L132">        columns.put(column.getName(), column);</span>
+
+<span class="nc" id="L134">        return column;</span>
+    }
+
+    /**
+     * @param indexName
+     * @return
+     */
+    public TableIndex getIndex(String indexName) {
+<span class="nc" id="L142">        return indexes.get(indexName);</span>
+    }
+
+    public CaseInsensitiveMap&lt;TableIndex&gt; getIndexesMap() {
+<span class="nc" id="L146">        return indexes;</span>
+    }
+
+    /**
+     * Returns the catalog that the table belongs to
+     *
+     * @return
+     */
+    public String getCatalog() {
+<span class="fc" id="L155">        return catalog;</span>
+    }
+
+    /**
+     * Returns the schema that the table belongs to
+     *
+     * @return
+     */
+    public String getSchema() {
+<span class="fc" id="L164">        return schema;</span>
+    }
+
+    /**
+     * Returns the logical 'container' that the table
+     * lives in.  Basically it's the first non-&lt;code&gt;null&lt;/code&gt;
+     * item out of &lt;code&gt;schema&lt;/code&gt;, &lt;code&gt;catalog&lt;/code&gt;
+     * and &lt;code&gt;database&lt;/code&gt;.
+     *
+     * @return
+     */
+    public String getContainer() {
+<span class="fc" id="L176">        return container;</span>
+    }
+
+    /**
+     * Returns the name of the table
+     *
+     * @return
+     */
+    public String getName() {
+<span class="fc" id="L185">        return name;</span>
+    }
+
+    /**
+     * Returns the fully-qualified name of this table
+     *
+     * @return
+     */
+    public String getFullName() {
+<span class="fc" id="L194">        return fullName;</span>
+    }
+
+    /**
+     * Returns the fully-qualified name of a table
+     *
+     * @return
+     */
+    public static String getFullName(String db, String catalog, String schema, String table) {
+<span class="fc bfc" id="L203" title="All 8 branches covered.">        return (catalog == null &amp;&amp; schema == null ? db + '.' : &quot;&quot;) +</span>
+                (catalog == null ? &quot;&quot; : catalog + '.') +
+                (schema == null ? &quot;&quot; : schema + '.') + table;
+    }
+
+    /**
+     * Object IDs are useful for tables such as DB/2 that many times
+     * give error messages based on object ID and not name
+     *
+     * @param id
+     */
+    public void setId(Object id) {
+<span class="nc" id="L215">        this.id = id;</span>
+<span class="nc" id="L216">    }</span>
+
+    /**
+     * @return
+     * @see #setId(Object)
+     */
+    public Object getId() {
+<span class="fc" id="L223">        return id;</span>
+    }
+
+    /**
+     * Returns the check constraints associated with this table
+     *
+     * @return
+     */
+    public Map&lt;String, String&gt; getCheckConstraints() {
+<span class="fc" id="L232">        return checkConstraints;</span>
+    }
+
+    /**
+     * Returns the indexes that are applied to this table
+     *
+     * @return
+     */
+    public Set&lt;TableIndex&gt; getIndexes() {
+<span class="fc" id="L241">        return new HashSet&lt;&gt;(indexes.values());</span>
+    }
+
+    /**
+     * Returns a collection of table columns that have been identified as &quot;primary&quot;
+     *
+     * @return
+     */
+    public List&lt;TableColumn&gt; getPrimaryColumns() {
+<span class="fc" id="L250">        return primaryKeys;</span>
+    }
+
+    /**
+     * @return Comments associated with this table, or &lt;code&gt;null&lt;/code&gt; if none.
+     */
+    public String getComments() {
+<span class="fc" id="L257">        return comments;</span>
+    }
+
+    /**
+     * Sets the comments that are associated with this table
+     *
+     * @param comments
+     */
+    public void setComments(String comments) {
+<span class="fc bfc" id="L266" title="All 4 branches covered.">        String cmts = (comments == null || comments.trim().length() == 0) ? null : comments.trim();</span>
+
+        // MySQL's InnoDB engine does some insane crap of storing erroneous details in
+        // with table comments.  Here I attempt to strip the &quot;crap&quot; out without impacting
+        // other databases.  Ideally this should happen in selectColumnCommentsSql (and
+        // therefore isolate it to MySQL), but it's a bit too complex to do cleanly.
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (cmts != null) {</span>
+<span class="fc" id="L273">            int crapIndex = cmts.indexOf(&quot;; InnoDB free: &quot;);</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            if (crapIndex == -1)</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                crapIndex = cmts.startsWith(&quot;InnoDB free: &quot;) ? 0 : -1;</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (crapIndex != -1) {</span>
+<span class="nc" id="L277">                cmts = cmts.substring(0, crapIndex).trim();</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                cmts = cmts.length() == 0 ? null : cmts;</span>
+            }
+        }
+
+<span class="fc" id="L282">        this.comments = cmts;</span>
+<span class="fc" id="L283">    }</span>
+
+    /**
+     * Returns the {@link TableColumn} with the given name, or &lt;code&gt;null&lt;/code&gt;
+     * if it doesn't exist
+     *
+     * @param columnName
+     * @return
+     */
+    public TableColumn getColumn(String columnName) {
+<span class="fc" id="L293">        return columns.get(columnName);</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;List&lt;/code&gt; of &lt;code&gt;TableColumn&lt;/code&gt;s in ascending column number order.
+     *
+     * @return
+     */
+    public List&lt;TableColumn&gt; getColumns() {
+<span class="fc" id="L302">        Set&lt;TableColumn&gt; sorted = new TreeSet&lt;&gt;(new ByColumnIdComparator());</span>
+<span class="fc" id="L303">        sorted.addAll(columns.values());</span>
+<span class="fc" id="L304">        return new ArrayList&lt;&gt;(sorted);</span>
+    }
+
+    public void setColumns(CaseInsensitiveMap&lt;TableColumn&gt; columns) {
+<span class="fc" id="L308">        this.columns = columns;</span>
+<span class="fc" id="L309">    }</span>
+
+    /**
+     * Returns &lt;code&gt;CaseInsensitiveMap&lt;/code&gt; of &lt;code&gt;TableColumn&lt;/code&gt;s.
+     *
+     * @return
+     */
+    public CaseInsensitiveMap&lt;TableColumn&gt; getColumnsMap() {
+<span class="fc" id="L317">        return columns;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this table references no other tables..&lt;p/&gt;
+     * Used in dependency analysis.
+     *
+     * @return
+     */
+    public boolean isRoot() {
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            if (column.isForeignKey()) {</span>
+<span class="fc" id="L329">                return false;</span>
+            }
+<span class="fc" id="L331">        }</span>
+
+<span class="fc" id="L333">        return true;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this table is referenced by no other tables.&lt;p/&gt;
+     * Used in dependency analysis.
+     *
+     * @return
+     */
+    public boolean isLeaf() {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            if (!column.getChildren().isEmpty()) {</span>
+<span class="fc" id="L345">                return false;</span>
+            }
+<span class="fc" id="L347">        }</span>
+
+<span class="fc" id="L349">        return true;</span>
+    }
+
+    /**
+     * Returns the maximum number of parents that this table has had before
+     * any had been removed during dependency analysis
+     *
+     * @return
+     */
+    public int getMaxParents() {
+<span class="fc" id="L359">        return maxParents;</span>
+    }
+
+    /**
+     * Notification that's called to indicate that a parent has been added to
+     * this table
+     */
+    public void addedParent() {
+<span class="fc" id="L367">        maxParents++;</span>
+<span class="fc" id="L368">    }</span>
+
+    /**
+     * &quot;Unlink&quot; all of the parent tables from this table
+     */
+    public void unlinkParents() {
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc" id="L375">            column.unlinkParents();</span>
+<span class="fc" id="L376">        }</span>
+<span class="fc" id="L377">    }</span>
+
+    /**
+     * Returns the maximum number of children that this table has had before
+     * any had been removed during dependency analysis
+     *
+     * @return
+     */
+    public int getMaxChildren() {
+<span class="fc" id="L386">        return maxChildren;</span>
+    }
+
+    /**
+     * Notification that's called to indicate that a child has been added to
+     * this table
+     */
+    public void addedChild() {
+<span class="fc" id="L394">        maxChildren++;</span>
+<span class="fc" id="L395">    }</span>
+
+    /**
+     * &quot;Unlink&quot; all of the child tables from this table
+     */
+    public void unlinkChildren() {
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc" id="L402">            column.unlinkChildren();</span>
+<span class="fc" id="L403">        }</span>
+<span class="fc" id="L404">    }</span>
+
+    /**
+     * Remove a single self referencing constraint if one exists.
+     *
+     * @return
+     */
+    public ForeignKeyConstraint removeSelfReferencingConstraint() {
+<span class="fc" id="L412">        return remove(getSelfReferencingConstraint());</span>
+    }
+
+    /**
+     * Remove the specified {@link ForeignKeyConstraint} from this table.&lt;p&gt;
+     * &lt;p&gt;
+     * This is a more drastic removal solution that was proposed by Remke Rutgers
+     *
+     * @param constraint
+     */
+    private ForeignKeyConstraint remove(ForeignKeyConstraint constraint) {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (constraint != null) {</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">            for (int i = 0; i &lt; constraint.getChildColumns().size(); i++) {</span>
+<span class="fc" id="L425">                TableColumn childColumn = constraint.getChildColumns().get(i);</span>
+<span class="fc" id="L426">                TableColumn parentColumn = constraint.getParentColumns().get(i);</span>
+<span class="fc" id="L427">                childColumn.removeParent(parentColumn);</span>
+<span class="fc" id="L428">                parentColumn.removeChild(childColumn);</span>
+            }
+        }
+<span class="fc" id="L431">        return constraint;</span>
+    }
+
+    /**
+     * Return a self referencing constraint if one exists
+     *
+     * @return
+     */
+    private ForeignKeyConstraint getSelfReferencingConstraint() {
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">            for (TableColumn parentColumn : column.getParents()) {</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">                if (compareTo(parentColumn.getTable()) == 0) {</span>
+<span class="fc" id="L443">                    return column.getParentConstraint(parentColumn);</span>
+                }
+<span class="fc" id="L445">            }</span>
+<span class="fc" id="L446">        }</span>
+<span class="fc" id="L447">        return null;</span>
+    }
+
+    /**
+     * Remove any non-real foreign keys
+     *
+     * @return
+     */
+    public List&lt;ForeignKeyConstraint&gt; removeNonRealForeignKeys() {
+<span class="fc" id="L456">        List&lt;ForeignKeyConstraint&gt; nonReals = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            for (TableColumn parentColumn : column.getParents()) {</span>
+<span class="fc" id="L460">                ForeignKeyConstraint constraint = column.getParentConstraint(parentColumn);</span>
+<span class="pc bpc" id="L461" title="2 of 4 branches missed.">                if (constraint != null &amp;&amp; !constraint.isReal()) {</span>
+<span class="nc" id="L462">                    nonReals.add(constraint);</span>
+                }
+<span class="fc" id="L464">            }</span>
+<span class="fc" id="L465">        }</span>
+
+        // remove constraints outside of above loop to prevent
+        // concurrent modification exceptions while iterating
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        for (ForeignKeyConstraint constraint : nonReals) {</span>
+<span class="nc" id="L470">            remove(constraint);</span>
+<span class="nc" id="L471">        }</span>
+
+<span class="fc" id="L473">        return nonReals;</span>
+    }
+
+    /**
+     * Returns the number of tables that reference this table
+     *
+     * @return
+     */
+    public int getNumChildren() {
+<span class="fc" id="L482">        int numChildren = 0;</span>
+
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc" id="L485">            numChildren += column.getChildren().size();</span>
+<span class="fc" id="L486">        }</span>
+
+<span class="fc" id="L488">        return numChildren;</span>
+    }
+
+    /**
+     * Returns the number of non-implied children
+     *
+     * @return
+     */
+    public int getNumNonImpliedChildren() {
+<span class="fc" id="L497">        int numChildren = 0;</span>
+
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">            for (TableColumn childColumn : column.getChildren()) {</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                if (!column.getChildConstraint(childColumn).isImplied())</span>
+<span class="nc" id="L502">                    ++numChildren;</span>
+<span class="nc" id="L503">            }</span>
+<span class="fc" id="L504">        }</span>
+
+<span class="fc" id="L506">        return numChildren;</span>
+    }
+
+    /**
+     * Returns the number of tables that are referenced by this table
+     *
+     * @return
+     */
+    public int getNumParents() {
+<span class="fc" id="L515">        int numParents = 0;</span>
+
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="fc" id="L518">            numParents += column.getParents().size();</span>
+<span class="fc" id="L519">        }</span>
+
+<span class="fc" id="L521">        return numParents;</span>
+    }
+
+    /**
+     * Returns the number of non-implied parents
+     *
+     * @return
+     */
+    public int getNumNonImpliedParents() {
+<span class="fc" id="L530">        int numParents = 0;</span>
+
+<span class="fc bfc" id="L532" title="All 2 branches covered.">        for (TableColumn column : columns.values()) {</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            for (TableColumn parentColumn : column.getParents()) {</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                if (!column.getParentConstraint(parentColumn).isImplied())</span>
+<span class="nc" id="L535">                    ++numParents;</span>
+<span class="nc" id="L536">            }</span>
+<span class="fc" id="L537">        }</span>
+
+<span class="fc" id="L539">        return numParents;</span>
+    }
+
+    /**
+     * Remove one foreign key constraint.
+     * &lt;p&gt;
+     * &lt;p/&gt;Used during dependency analysis phase.
+     *
+     * @return
+     */
+    public ForeignKeyConstraint removeAForeignKeyConstraint() {
+<span class="fc" id="L550">        final List&lt;TableColumn&gt; sortedColumns = getColumns();</span>
+<span class="fc" id="L551">        int numParents = 0;</span>
+<span class="fc" id="L552">        int numChildren = 0;</span>
+        // remove either a child or parent, choosing which based on which has the
+        // least number of foreign key associations (when either gets to zero then
+        // the table can be pruned)
+<span class="fc bfc" id="L556" title="All 2 branches covered.">        for (TableColumn column : sortedColumns) {</span>
+<span class="fc" id="L557">            numParents += column.getParents().size();</span>
+<span class="fc" id="L558">            numChildren += column.getChildren().size();</span>
+<span class="fc" id="L559">        }</span>
+
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        for (TableColumn column : sortedColumns) {</span>
+            ForeignKeyConstraint constraint;
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">            if (numParents &lt;= numChildren)</span>
+<span class="fc" id="L564">                constraint = column.removeAParentFKConstraint();</span>
+            else
+<span class="nc" id="L566">                constraint = column.removeAChildFKConstraint();</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">            if (constraint != null)</span>
+<span class="fc" id="L568">                return constraint;</span>
+<span class="nc" id="L569">        }</span>
+
+<span class="nc" id="L571">        return null;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this table is logical (not physical), &lt;code&gt;false&lt;/code&gt; otherwise
+     *
+     * @return
+     */
+    public boolean isLogical() {
+<span class="nc" id="L580">        return false;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this is a view, &lt;code&gt;false&lt;/code&gt; otherwise
+     *
+     * @return
+     */
+    public boolean isView() {
+<span class="fc" id="L589">        return false;</span>
+    }
+
+
+    /**
+     * Returns name of table type &lt;code&gt;View&lt;/code&gt; if this is a view, &lt;code&gt;Table&lt;/code&gt; otherwise
+     *
+     * @return
+     */
+    public String getType() {
+<span class="nc bnc" id="L599" title="All 2 branches missed.">        return isView() ? &quot;View&quot; : &quot;Table&quot;;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this table is remote (in another schema), &lt;code&gt;false&lt;/code&gt; otherwise
+     *
+     * @return
+     */
+    public boolean isRemote() {
+<span class="fc" id="L608">        return false;</span>
+    }
+
+    /**
+     * If this is a view it returns the SQL used to create the view (if it's available).
+     * &lt;code&gt;null&lt;/code&gt; if it's not a view or the SQL isn't available.
+     *
+     * @return
+     * @see #isView()
+     */
+    public String getViewDefinition() {
+<span class="nc" id="L619">        return null;</span>
+    }
+
+    /**
+     * Returns the number of rows contained in this table, or -1 if unable to determine
+     * the number of rows.
+     *
+     * @return
+     */
+    public long getNumRows() {
+<span class="fc" id="L629">        return numRows;</span>
+    }
+
+    /**
+     * Explicitly set the number of rows in this table
+     *
+     * @param numRows
+     */
+    public void setNumRows(long numRows) {
+<span class="nc" id="L638">        this.numRows = numRows;</span>
+<span class="nc" id="L639">    }</span>
+
+    /**
+     * Update the table with the specified XML-derived metadata
+     *
+     * @param tableMeta
+     */
+    public void update(TableMeta tableMeta) {
+<span class="nc" id="L647">        String newComments = tableMeta.getComments();</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">        if (newComments != null) {</span>
+<span class="nc" id="L649">            comments = newComments;</span>
+        }
+
+<span class="nc bnc" id="L652" title="All 2 branches missed.">        for (TableColumnMeta colMeta : tableMeta.getColumns()) {</span>
+<span class="nc" id="L653">            TableColumn col = getColumn(colMeta.getName());</span>
+<span class="nc bnc" id="L654" title="All 2 branches missed.">            if (col == null) {</span>
+<span class="nc" id="L655">                col = addColumn(colMeta);</span>
+            }
+
+            // update the column with the changes
+<span class="nc" id="L659">            col.update(colMeta);</span>
+<span class="nc" id="L660">        }</span>
+<span class="nc" id="L661">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L665">        return getName();</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this table has no relationships
+     *
+     * @param withImpliedRelationships boolean
+     * @return boolean
+     */
+    public boolean isOrphan(boolean withImpliedRelationships) {
+<span class="nc bnc" id="L675" title="All 2 branches missed.">        if (withImpliedRelationships)</span>
+<span class="nc bnc" id="L676" title="All 4 branches missed.">            return getMaxParents() == 0 &amp;&amp; getMaxChildren() == 0;</span>
+
+<span class="nc bnc" id="L678" title="All 2 branches missed.">        for (TableColumn column : columns.values()) {</span>
+<span class="nc bnc" id="L679" title="All 2 branches missed.">            for (TableColumn parentColumn : column.getParents()) {</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                if (!column.getParentConstraint(parentColumn).isImplied())</span>
+<span class="nc" id="L681">                    return false;</span>
+<span class="nc" id="L682">            }</span>
+<span class="nc bnc" id="L683" title="All 2 branches missed.">            for (TableColumn childColumn : column.getChildren()) {</span>
+<span class="nc bnc" id="L684" title="All 2 branches missed.">                if (!column.getChildConstraint(childColumn).isImplied())</span>
+<span class="nc" id="L685">                    return false;</span>
+<span class="nc" id="L686">            }</span>
+<span class="nc" id="L687">        }</span>
+<span class="nc" id="L688">        return true;</span>
+    }
+
+    /**
+     * Compare this table to another table.
+     * Results are based on 1: identity, 2: table name, 3: schema name&lt;p/&gt;
+     * &lt;p&gt;
+     * This implementation was put in place to deal with analyzing multiple
+     * schemas that contain identically named tables.
+     *
+     * @see {@link Comparable#compareTo(Object)}
+     */
+    public int compareTo(Table other) {
+<span class="fc bfc" id="L701" title="All 2 branches covered.">        if (other == this)  // fast way out</span>
+<span class="fc" id="L702">            return 0;</span>
+
+<span class="fc" id="L704">        return getFullName().compareToIgnoreCase(other.getFullName());</span>
+    }
+
+    /**
+     * Implementation of {@link Comparator} that sorts {@link TableColumn}s
+     * by {@link TableColumn#getId() ID} (ignored if &lt;code&gt;null&lt;/code&gt;)
+     * followed by {@link TableColumn#getName() Name}.
+     */
+<span class="fc" id="L712">    public static class ByColumnIdComparator implements Comparator&lt;TableColumn&gt; {</span>
+        public int compare(TableColumn column1, TableColumn column2) {
+<span class="fc" id="L714">            Object id1 = column1.getId();</span>
+<span class="fc" id="L715">            Object id2 = column2.getId();</span>
+
+<span class="pc bpc" id="L717" title="3 of 4 branches missed.">            if (id1 == null || id2 == null)</span>
+<span class="fc" id="L718">                return column1.getName().compareToIgnoreCase(column2.getName());</span>
+<span class="nc bnc" id="L719" title="All 4 branches missed.">            if (id1 instanceof Number &amp;&amp; id2 instanceof Number)</span>
+<span class="nc" id="L720">                return ((Number) id1).intValue() - ((Number) id2).intValue();</span>
+<span class="nc" id="L721">            return id1.toString().compareToIgnoreCase(id2.toString());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

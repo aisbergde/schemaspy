@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SqlService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">SqlService.java</span></div><h1>SqlService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011, 2014 John Currier
+ * Copyright (C) 2016, 2017 Rafal Kasa
+ * Copyright (C) 2017 Ismail Simsek
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Nils Petzaell
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Foobar. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.Config;
+import org.schemaspy.input.dbms.DbDriverLoader;
+import org.schemaspy.model.Database;
+import org.schemaspy.model.DbmsMeta;
+import org.schemaspy.model.InvalidConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Optional.ofNullable;
+
+/**
+ * Created by rkasa on 2016-12-10.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Thomas Traude
+ * @author Nils Petzaell
+ * @auther Daniel Watt
+ */
+<span class="fc" id="L56">public class SqlService {</span>
+
+<span class="fc" id="L58">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L60">    private DbmsService dbmsService = new DbmsService();</span>
+
+    private Connection connection;
+    private DatabaseMetaData databaseMetaData;
+    private DbmsMeta dbmsMeta;
+    private Pattern invalidIdentifierPattern;
+    private Set&lt;String&gt; allKeywords;
+
+    public DatabaseMetaData connect(Config config) throws IOException, SQLException {
+<span class="fc" id="L69">        DbDriverLoader driverLoader = new DbDriverLoader();</span>
+<span class="fc" id="L70">        connection = driverLoader.getConnection(config);</span>
+
+<span class="fc" id="L72">        databaseMetaData = connection.getMetaData();</span>
+<span class="fc" id="L73">        dbmsMeta = dbmsService.fetchDbmsMeta(databaseMetaData);</span>
+<span class="fc" id="L74">        invalidIdentifierPattern = createInvalidIdentifierPattern(databaseMetaData);</span>
+<span class="fc" id="L75">        allKeywords = dbmsMeta.getAllKeywords();</span>
+
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (config.isEvaluateAllEnabled()) {</span>
+<span class="nc" id="L78">            return null;    // no database to return</span>
+        }
+
+<span class="fc" id="L81">        return databaseMetaData;</span>
+    }
+
+
+    /**
+     * Return a &lt;code&gt;Pattern&lt;/code&gt; whose matcher will return &lt;code&gt;true&lt;/code&gt;
+     * when run against an identifier that contains a character that is not
+     * acceptable by the database without being quoted.
+     */
+    private static Pattern createInvalidIdentifierPattern(DatabaseMetaData databaseMetaData) throws SQLException {
+<span class="fc" id="L91">        StringBuilder validChars = new StringBuilder(&quot;a-zA-Z0-9_&quot;);</span>
+<span class="fc" id="L92">        String reservedRegexChars = &quot;-&amp;^&quot;;</span>
+<span class="fc" id="L93">        String extraValidChars = databaseMetaData.getExtraNameCharacters();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int i = 0; i &lt; extraValidChars.length(); ++i) {</span>
+<span class="fc" id="L95">            char ch = extraValidChars.charAt(i);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (reservedRegexChars.indexOf(ch) &gt;= 0)</span>
+<span class="nc" id="L97">                validChars.append(&quot;&quot; + &quot;\\&quot;);</span>
+<span class="fc" id="L98">            validChars.append(ch);</span>
+        }
+<span class="fc" id="L100">        return Pattern.compile(&quot;[^&quot; + validChars + &quot;]&quot;);</span>
+    }
+
+    public Connection getConnection() {
+<span class="nc" id="L104">        return connection;</span>
+    }
+
+    public DatabaseMetaData getDatabaseMetaData() {
+<span class="fc" id="L108">        return databaseMetaData;</span>
+    }
+
+    public DbmsMeta getDbmsMeta() {
+<span class="fc" id="L112">        return dbmsMeta;</span>
+    }
+
+    /**
+     * Create a &lt;code&gt;PreparedStatement&lt;/code&gt; from the specified SQL.
+     * The SQL can contain these named parameters (but &lt;b&gt;not&lt;/b&gt; question marks).
+     * &lt;ol&gt;
+     * &lt;li&gt;:schema - replaced with the name of the schema
+     * &lt;li&gt;:owner - alias for :schema
+     * &lt;li&gt;:table - replaced with the name of the table
+     * &lt;/ol&gt;
+     *
+     * @param sql       String - SQL without question marks
+     * @param tableName String - &lt;code&gt;null&lt;/code&gt; if the statement doesn't deal with &lt;code&gt;Table&lt;/code&gt;-level details.
+     * @return PreparedStatement
+     * @throws SQLException
+     */
+    public PreparedStatement prepareStatement(String sql, Database db, String tableName) throws SQLException {
+<span class="fc" id="L130">        StringBuilder sqlBuf = new StringBuilder(sql);</span>
+<span class="fc" id="L131">        List&lt;String&gt; sqlParams = getSqlParams(sqlBuf, db.getName(), db.getCatalog().getName(), db.getSchema().getName(), tableName); // modifies sqlBuf</span>
+<span class="fc" id="L132">        LOGGER.debug(&quot;{} {}&quot;, sqlBuf, sqlParams);</span>
+
+<span class="fc" id="L134">        PreparedStatement stmt = connection.prepareStatement(sqlBuf.toString());</span>
+        try {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            for (int i = 0; i &lt; sqlParams.size(); ++i) {</span>
+<span class="fc" id="L137">                stmt.setString(i + 1, sqlParams.get(i));</span>
+            }
+<span class="nc" id="L139">        } catch (SQLException exc) {</span>
+<span class="nc" id="L140">            stmt.close();</span>
+<span class="nc" id="L141">            throw exc;</span>
+<span class="fc" id="L142">        }</span>
+
+<span class="fc" id="L144">        return stmt;</span>
+    }
+
+    /**
+     * Replaces named parameters in &lt;code&gt;sql&lt;/code&gt; with question marks and
+     * returns appropriate matching values in the returned &lt;code&gt;List&lt;/code&gt; of &lt;code&gt;String&lt;/code&gt;s.
+     *
+     * @param sql       StringBuffer input SQL with named parameters, output named params are replaced with ?'s.
+     * @param tableName String
+     * @return List of Strings
+     * @see #prepareStatement(String, Database, String)
+     */
+    private static List&lt;String&gt; getSqlParams(StringBuilder sql, String dbName, String catalog, String schema, String tableName) {
+<span class="fc" id="L157">        Map&lt;String, String&gt; namedParams = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (Objects.isNull(schema)) {</span>
+<span class="nc" id="L159">            schema = dbName; // some 'schema-less' db's treat the db name like a schema (unusual case)</span>
+        }
+        
+<span class="fc" id="L162">        namedParams.put(&quot;:dbname&quot;, dbName);</span>
+<span class="fc" id="L163">        namedParams.put(&quot;:schema&quot;, schema);</span>
+<span class="fc" id="L164">        namedParams.put(&quot;:owner&quot;, schema); // alias for :schema</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (Objects.nonNull(tableName)) {</span>
+<span class="fc" id="L166">            namedParams.put(&quot;:table&quot;, tableName);</span>
+<span class="fc" id="L167">            namedParams.put(&quot;:view&quot;, tableName); // alias for :table</span>
+        }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (Objects.nonNull(catalog)) {</span>
+<span class="fc" id="L170">            namedParams.put(&quot;:catalog&quot;, catalog);</span>
+        }
+
+<span class="fc" id="L173">        List&lt;String&gt; sqlParams = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L174">        int nextColon = sql.indexOf(&quot;:&quot;);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        while (nextColon != -1) {</span>
+<span class="fc" id="L176">            String paramName = new StringTokenizer(sql.substring(nextColon), &quot; ,\&quot;')&quot;).nextToken();</span>
+<span class="fc" id="L177">            String paramValue = namedParams.get(paramName);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (Objects.isNull(paramValue))</span>
+<span class="nc" id="L179">                throw new InvalidConfigurationException(&quot;Unexpected named parameter '&quot; + paramName + &quot;' found in SQL '&quot; + sql + &quot;'&quot;);</span>
+<span class="fc" id="L180">            sqlParams.add(paramValue);</span>
+<span class="fc" id="L181">            sql.replace(nextColon, nextColon + paramName.length(), &quot;?&quot;); // replace with a ?</span>
+<span class="fc" id="L182">            nextColon = sql.indexOf(&quot;:&quot;, nextColon);</span>
+<span class="fc" id="L183">        }</span>
+
+<span class="fc" id="L185">        return sqlParams;</span>
+    }
+
+    public PreparedStatement prepareStatement(String sqlQuery) throws SQLException {
+<span class="fc" id="L189">        return connection.prepareStatement(sqlQuery);</span>
+    }
+
+    public String getQualifiedTableName(String catalog, String schema, String tableName, boolean forceQuotes) {
+<span class="fc" id="L193">        String schemaOrCatalog = getSchemaOrCatalog(ofNullable(schema).orElse(catalog), forceQuotes);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (forceQuotes) {</span>
+<span class="fc" id="L195">            return schemaOrCatalog + quoteIdentifier(tableName);</span>
+        } else {
+<span class="fc" id="L197">            return schemaOrCatalog + getQuotedIdentifier(tableName);</span>
+        }
+    }
+
+    private String getSchemaOrCatalog(String schemaOrCatalog, boolean forceQuotes) {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (Objects.isNull(schemaOrCatalog)) {</span>
+<span class="fc" id="L203">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (forceQuotes) {</span>
+<span class="fc" id="L206">            return quoteIdentifier(schemaOrCatalog) + &quot;.&quot;;</span>
+        } else {
+<span class="fc" id="L208">            return getQuotedIdentifier(schemaOrCatalog) + &quot;.&quot;;</span>
+        }
+    }
+
+    /**
+     * Return &lt;code&gt;id&lt;/code&gt; quoted if required, otherwise return &lt;code&gt;id&lt;/code&gt;
+     *
+     * @param id
+     * @return
+     * @throws SQLException
+     */
+    public String getQuotedIdentifier(String id) {
+        // look for any character that isn't valid (then matcher.find() returns true)
+<span class="fc" id="L221">        Matcher matcher = invalidIdentifierPattern.matcher(id);</span>
+
+<span class="fc bfc" id="L223" title="All 4 branches covered.">        boolean quotesRequired = matcher.find() || allKeywords.contains(id);</span>
+
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (quotesRequired) {</span>
+            // name contains something that must be quoted
+<span class="fc" id="L227">            return quoteIdentifier(id);</span>
+        }
+
+        // no quoting necessary
+<span class="fc" id="L231">        return id;</span>
+    }
+
+    public String quoteIdentifier(String id) {
+<span class="fc" id="L235">        String quote = dbmsMeta.getIdentifierQuoteString();</span>
+<span class="fc" id="L236">        return quote + id + quote;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlSequenceFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.xml.dom</a> &gt; <span class="el_source">XmlSequenceFormatter.java</span></div><h1>XmlSequenceFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2018 AE Ibrahim
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.output.xml.dom;
+
+import org.schemaspy.model.Sequence;
+import org.w3c.dom.Element;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
+
+<span class="fc" id="L29">public class XmlSequenceFormatter {</span>
+
+    public void appendSequences(Element schemaNode, Collection&lt;Sequence&gt; sequences) {
+<span class="fc" id="L32">        LinkedList&lt;Sequence&gt; sequencesList = new LinkedList&lt;&gt;(sequences);</span>
+<span class="fc" id="L33">        Collections.sort(sequencesList, Comparator.comparing(Sequence::getName));</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!sequencesList.isEmpty()) {</span>
+<span class="nc" id="L35">            Element sequencesElement = schemaNode.getOwnerDocument().createElement(&quot;sequences&quot;);</span>
+<span class="nc" id="L36">            schemaNode.appendChild(sequencesElement);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">            for (Sequence sequence : sequencesList) {</span>
+<span class="nc" id="L38">                appendSequence(sequencesElement, sequence);</span>
+<span class="nc" id="L39">            }</span>
+        }
+<span class="fc" id="L41">    }</span>
+
+    private static void appendSequence(Element sequencesElement, Sequence sequence) {
+<span class="nc" id="L44">        Element sequenceElement = sequencesElement.getOwnerDocument().createElement(&quot;sequence&quot;);</span>
+<span class="nc" id="L45">        sequencesElement.appendChild(sequenceElement);</span>
+<span class="nc" id="L46">        DOMUtil.appendAttribute(sequenceElement, &quot;name&quot;, sequence.getName());</span>
+<span class="nc" id="L47">        DOMUtil.appendAttribute(sequenceElement, &quot;startValue&quot;, Integer.toString(sequence.getStartValue()));</span>
+<span class="nc" id="L48">        DOMUtil.appendAttribute(sequenceElement, &quot;increment&quot;, Integer.toString(sequence.getIncrement()));</span>
+<span class="nc" id="L49">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

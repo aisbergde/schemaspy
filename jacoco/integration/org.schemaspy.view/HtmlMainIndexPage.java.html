@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HtmlMainIndexPage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.view</a> &gt; <span class="el_source">HtmlMainIndexPage.java</span></div><h1>HtmlMainIndexPage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016, 2017 Rafal Kasa
+ * Copyright (C) 2016, 2017 Ismail Simsek
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.view;
+
+import org.schemaspy.DbAnalyzer;
+import org.schemaspy.model.Database;
+import org.schemaspy.model.ForeignKeyConstraint;
+import org.schemaspy.model.Table;
+import org.schemaspy.util.Markdown;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.Writer;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+
+/**
+ * The main index that contains all tables and views that were evaluated
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class HtmlMainIndexPage {
+
+<span class="fc" id="L53">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final MustacheCompiler mustacheCompiler;
+    private final String description;
+
+<span class="fc" id="L58">    public HtmlMainIndexPage(MustacheCompiler mustacheCompiler, String description) {</span>
+<span class="fc" id="L59">        this.mustacheCompiler = mustacheCompiler;</span>
+<span class="fc" id="L60">        this.description = description;</span>
+<span class="fc" id="L61">    }</span>
+
+    public void write(Database database, Collection&lt;Table&gt; tables, List&lt;? extends ForeignKeyConstraint&gt; impliedConstraints, Writer writer) {
+<span class="fc" id="L64">        List&lt;MustacheTable&gt; mustacheTables = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L66">        long columnsAmount = 0;</span>
+
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for(Table table: tables) {</span>
+<span class="fc" id="L69">            columnsAmount += table.getColumns().size();</span>
+<span class="fc" id="L70">            String comments = Markdown.toHtml(table.getComments(), &quot;&quot;);</span>
+<span class="fc" id="L71">            MustacheTable mustacheTable = new MustacheTable(table, &quot;&quot;);</span>
+<span class="fc" id="L72">            mustacheTable.setComments(comments);</span>
+<span class="fc" id="L73">            mustacheTables.add(mustacheTable);</span>
+<span class="fc" id="L74">        }</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        long tablesAmount = tables.stream().filter(t -&gt; !t.isView()).count();</span>
+<span class="fc" id="L77">        long viewsAmount = tables.stream().filter(Table::isView).count();</span>
+<span class="fc" id="L78">        long constraintsAmount = DbAnalyzer.getForeignKeyConstraints(tables).size();</span>
+<span class="fc" id="L79">        long routinesAmount = database.getRoutines().size();</span>
+<span class="fc" id="L80">        long anomaliesAmount = getAllAnomaliesAmount(tables, impliedConstraints);</span>
+
+<span class="fc" id="L82">        PageData pageData = new PageData.Builder()</span>
+<span class="fc" id="L83">                .templateName(&quot;main.html&quot;)</span>
+<span class="fc" id="L84">                .scriptName(&quot;main.js&quot;)</span>
+<span class="fc" id="L85">                .addToScope(&quot;tablesAmount&quot;, tablesAmount)</span>
+<span class="fc" id="L86">                .addToScope(&quot;viewsAmount&quot;, viewsAmount)</span>
+<span class="fc" id="L87">                .addToScope(&quot;columnsAmount&quot;, columnsAmount)</span>
+<span class="fc" id="L88">                .addToScope(&quot;constraintsAmount&quot;, constraintsAmount)</span>
+<span class="fc" id="L89">                .addToScope(&quot;routinesAmount&quot;, routinesAmount)</span>
+<span class="fc" id="L90">                .addToScope(&quot;anomaliesAmount&quot;, anomaliesAmount)</span>
+<span class="fc" id="L91">                .addToScope(&quot;tables&quot;, mustacheTables)</span>
+<span class="fc" id="L92">                .addToScope(&quot;database&quot;, database)</span>
+<span class="fc" id="L93">                .addToScope(&quot;description&quot;, Markdown.toHtml(description, &quot;&quot;))</span>
+<span class="fc" id="L94">                .addToScope(&quot;schema&quot;, new MustacheSchema(database.getSchema(), &quot;&quot;))</span>
+<span class="fc" id="L95">                .addToScope(&quot;catalog&quot;, new MustacheCatalog(database.getCatalog(), &quot;&quot;))</span>
+<span class="fc" id="L96">                .addToScope(&quot;xmlName&quot;, getXmlName(database))</span>
+<span class="fc" id="L97">                .depth(0)</span>
+<span class="fc" id="L98">                .getPageData();</span>
+
+        try {
+<span class="fc" id="L101">            mustacheCompiler.write(pageData, writer);</span>
+<span class="nc" id="L102">        } catch (IOException e) {</span>
+<span class="nc" id="L103">            LOGGER.error(&quot;Failed to write main index page&quot;, e);</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">    }</span>
+
+    private static long getAllAnomaliesAmount(Collection&lt;Table&gt; tables, List&lt;? extends ForeignKeyConstraint&gt; impliedConstraints) {
+<span class="fc" id="L108">        long anomalies = 0;</span>
+<span class="fc" id="L109">        anomalies += DbAnalyzer.getTablesWithoutIndexes(new HashSet&lt;&gt;(tables)).size();</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        anomalies += impliedConstraints.stream().filter(c -&gt; !c.getChildTable().isView()).count();</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        anomalies += DbAnalyzer.getTablesWithOneColumn(tables).stream().filter(t -&gt; !t.isView()).count();</span>
+<span class="pc bnc" id="L112" title="All 2 branches missed.">        anomalies += DbAnalyzer.getTablesWithIncrementingColumnNames(tables).stream().filter(t -&gt; !t.isView()).count();</span>
+<span class="fc" id="L113">        anomalies += DbAnalyzer.getDefaultNullStringColumns(new HashSet&lt;&gt;(tables)).size();</span>
+
+<span class="fc" id="L115">        return anomalies;</span>
+    }
+
+    private static String getXmlName(Database db) {
+<span class="fc" id="L119">        StringBuilder description = new StringBuilder();</span>
+
+<span class="fc" id="L121">        description.append(db.getName());</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (db.getSchema() != null) {</span>
+<span class="fc" id="L123">            description.append('.');</span>
+<span class="fc" id="L124">            description.append(db.getSchema().getName());</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        } else if (db.getCatalog() != null) {</span>
+<span class="nc" id="L126">            description.append('.');</span>
+<span class="nc" id="L127">            description.append(db.getCatalog().getName());</span>
+        }
+
+<span class="fc" id="L130">        return description.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

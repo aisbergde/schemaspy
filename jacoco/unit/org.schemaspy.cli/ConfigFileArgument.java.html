@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConfigFileArgument.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.cli</a> &gt; <span class="el_source">ConfigFileArgument.java</span></div><h1>ConfigFileArgument.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2017 Thomas Traude
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.cli;
+
+import com.beust.jcommander.Parameter;
+
+import java.util.Optional;
+
+/**
+ * This class only contains the value for the optioanl &lt;code&gt;configFile&lt;/code&gt; command line argument.
+ * When setting the configFile parameter the user can provide an external properties file
+ * that holds values for all other configuration parameter.
+ * &lt;p&gt;
+ * Example:
+ * &lt;p&gt;
+ * Command line call:
+ * &lt;pre&gt;
+ *     java -jar schemaspy.jar -configFile myconfig.properties
+ * &lt;/pre&gt;
+ * &lt;p&gt;
+ * Content of myconfig.properties:
+ * &lt;pre&gt;
+ *     schemaspy.databaseType=mysql
+ *     schemaspy.outputDirectory=schemaspy-report
+ *     schemaspy.user=MyUser
+ *     ...
+ * &lt;/pre&gt;
+ * &lt;p&gt;
+ * Schemaspy checks for the presence &lt;code&gt;configFile&lt;/code&gt; argument before any other arguments defined in {@link CommandLineArguments}.
+ * @author Thomas Traude
+ */
+<span class="fc" id="L48">public final class ConfigFileArgument {</span>
+
+    @Parameter(names = &quot;-configFile&quot;)
+    private String configFile;
+
+    public Optional&lt;String&gt; getConfigFile() {
+<span class="fc" id="L54">        return Optional.ofNullable(configFile);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

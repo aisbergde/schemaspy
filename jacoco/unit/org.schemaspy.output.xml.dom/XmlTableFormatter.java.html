@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlTableFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.xml.dom</a> &gt; <span class="el_source">XmlTableFormatter.java</span></div><h1>XmlTableFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017 - 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.xml.dom;
+
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+
+import static org.schemaspy.output.xml.dom.XmlConstants.*;
+
+/**
+ * Formats {@link Table}s into an XML DOM tree.
+ *
+ * @author John Currier
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+<span class="fc" id="L43">public class XmlTableFormatter {</span>
+
+<span class="fc" id="L45">    private final XmlColumnFormatter xmlColumnFormatter = new XmlColumnFormatter();</span>
+<span class="fc" id="L46">    private final XmlIndexFormatter xmlIndexFormatter = new XmlIndexFormatter();</span>
+
+    /**
+     * Append the specified tables to the XML node
+     *
+     * @param schemaNode
+     * @param tables
+     */
+    public void appendTables(Element schemaNode, Collection&lt;Table&gt; tables) {
+<span class="fc" id="L55">        Document document = schemaNode.getOwnerDocument();</span>
+<span class="fc" id="L56">        Element tablesNode = document.createElement(&quot;tables&quot;);</span>
+<span class="fc" id="L57">        schemaNode.appendChild(tablesNode);</span>
+<span class="fc" id="L58">        tables.stream()</span>
+<span class="pc" id="L59">                .sorted((table1, table2) -&gt; table1.getName().compareToIgnoreCase(table2.getName()))</span>
+<span class="fc" id="L60">                .distinct()</span>
+<span class="fc" id="L61">                .forEachOrdered( t -&gt; appendTable(tablesNode, t));</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Append table details to the XML node
+     *
+     * @param tablesNode
+     * @param table
+     */
+    private void appendTable(Element tablesNode, Table table) {
+<span class="fc" id="L71">        Document document = tablesNode.getOwnerDocument();</span>
+<span class="fc" id="L72">        Element tableNode = document.createElement(TABLE);</span>
+<span class="fc" id="L73">        tablesNode.appendChild(tableNode);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (table.getId() != null)</span>
+<span class="nc" id="L75">            DOMUtil.appendAttribute(tableNode, &quot;id&quot;, String.valueOf(table.getId()));</span>
+<span class="fc" id="L76">        DOMUtil.appendAttribute(tableNode, CATALOG, table.getCatalog());</span>
+<span class="fc" id="L77">        DOMUtil.appendAttribute(tableNode, SCHEMA, table.getSchema());</span>
+<span class="fc" id="L78">        DOMUtil.appendAttribute(tableNode, &quot;name&quot;, table.getName());</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (table.getNumRows() &gt;= 0)</span>
+<span class="fc" id="L80">            DOMUtil.appendAttribute(tableNode, &quot;numRows&quot;, String.valueOf(table.getNumRows()));</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        DOMUtil.appendAttribute(tableNode, &quot;type&quot;, table.isView() ? &quot;VIEW&quot; : &quot;TABLE&quot;);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        DOMUtil.appendAttribute(tableNode, &quot;remarks&quot;, table.getComments() == null ? &quot;&quot; : table.getComments());</span>
+<span class="fc" id="L83">        xmlColumnFormatter.appendColumns(tableNode, table);</span>
+<span class="fc" id="L84">        appendPrimaryKeys(tableNode, table);</span>
+<span class="fc" id="L85">        xmlIndexFormatter.appendIndexes(tableNode, table);</span>
+<span class="fc" id="L86">        appendCheckConstraints(tableNode, table);</span>
+<span class="fc" id="L87">        appendView(tableNode, table);</span>
+<span class="fc" id="L88">    }</span>
+
+    /**
+     * Append primary key details to the XML node
+     *
+     * @param tableNode
+     * @param table
+     */
+    private static void appendPrimaryKeys(Element tableNode, Table table) {
+<span class="fc" id="L97">        Document document = tableNode.getOwnerDocument();</span>
+<span class="fc" id="L98">        int index = 1;</span>
+
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        for (TableColumn primaryKeyColumn : table.getPrimaryColumns()) {</span>
+<span class="nc" id="L101">            Node primaryKeyNode = document.createElement(&quot;primaryKey&quot;);</span>
+<span class="nc" id="L102">            tableNode.appendChild(primaryKeyNode);</span>
+
+<span class="nc" id="L104">            DOMUtil.appendAttribute(primaryKeyNode, COLUMN, primaryKeyColumn.getName());</span>
+<span class="nc" id="L105">            DOMUtil.appendAttribute(primaryKeyNode, &quot;sequenceNumberInPK&quot;, String.valueOf(index++));</span>
+<span class="nc" id="L106">        }</span>
+<span class="fc" id="L107">    }</span>
+
+    /**
+     * Append check constraint details to the XML node
+     *
+     * @param tableNode
+     * @param table
+     */
+    private static void appendCheckConstraints(Element tableNode, Table table) {
+<span class="fc" id="L116">        Document document = tableNode.getOwnerDocument();</span>
+<span class="fc" id="L117">        Map&lt;String, String&gt; constraints = table.getCheckConstraints();</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (constraints != null &amp;&amp; !constraints.isEmpty()) {</span>
+<span class="fc" id="L119">            constraints.forEach((name, value) -&gt; {</span>
+<span class="fc" id="L120">                Node constraintNode = document.createElement(&quot;checkConstraint&quot;);</span>
+<span class="fc" id="L121">                tableNode.appendChild(constraintNode);</span>
+
+<span class="fc" id="L123">                DOMUtil.appendAttribute(constraintNode, &quot;name&quot;, name);</span>
+<span class="fc" id="L124">                DOMUtil.appendAttribute(constraintNode, &quot;constraint&quot;, value);</span>
+<span class="fc" id="L125">            });</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    /**
+     * Append view SQL to the XML node
+     *
+     * @param tableNode
+     * @param table
+     */
+    private static void appendView(Element tableNode, Table table) {
+<span class="pc bpc" id="L136" title="3 of 4 branches missed.">        if (table.isView() &amp;&amp; Objects.nonNull(table.getViewDefinition())) {</span>
+<span class="nc" id="L137">            DOMUtil.appendAttribute(tableNode, &quot;viewSql&quot;, table.getViewDefinition());</span>
+        }
+<span class="fc" id="L139">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

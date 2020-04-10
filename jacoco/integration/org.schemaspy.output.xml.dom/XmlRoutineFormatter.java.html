@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlRoutineFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.xml.dom</a> &gt; <span class="el_source">XmlRoutineFormatter.java</span></div><h1>XmlRoutineFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.output.xml.dom;
+
+import org.schemaspy.model.Routine;
+import org.schemaspy.model.RoutineParameter;
+import org.w3c.dom.CDATASection;
+import org.w3c.dom.Element;
+
+import java.util.*;
+
+<span class="fc" id="L28">public class XmlRoutineFormatter {</span>
+
+    public void appendRoutines(Element schemaNode, Collection&lt;Routine&gt; routines) {
+<span class="fc" id="L31">        LinkedList&lt;Routine&gt; routinesList = new LinkedList&lt;&gt;(routines);</span>
+<span class="fc" id="L32">        Collections.sort(routinesList, Comparator.comparing(Routine::getName));</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (!routinesList.isEmpty()) {</span>
+<span class="fc" id="L34">            Element routinesElement = schemaNode.getOwnerDocument().createElement(&quot;routines&quot;);</span>
+<span class="fc" id="L35">            schemaNode.appendChild(routinesElement);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            for( Routine routine : routinesList) {</span>
+<span class="fc" id="L37">                appendRoutine(routinesElement, routine);</span>
+<span class="fc" id="L38">            }</span>
+        }
+<span class="fc" id="L40">    }</span>
+
+    private static void appendRoutine(Element routinesElement, Routine routine) {
+<span class="fc" id="L43">        Element routineElement = routinesElement.getOwnerDocument().createElement(&quot;routine&quot;);</span>
+<span class="fc" id="L44">        routinesElement.appendChild(routineElement);</span>
+<span class="fc" id="L45">        DOMUtil.appendAttribute(routineElement, &quot;name&quot;, routine.getName());</span>
+<span class="fc" id="L46">        DOMUtil.appendAttribute(routineElement, &quot;type&quot;, routine.getType());</span>
+<span class="fc" id="L47">        DOMUtil.appendAttribute(routineElement, &quot;returnType&quot;, routine.getReturnType());</span>
+<span class="fc" id="L48">        DOMUtil.appendAttribute(routineElement, &quot;dataAccess&quot;, routine.getDataAccess());</span>
+<span class="fc" id="L49">        DOMUtil.appendAttribute(routineElement, &quot;securityType&quot;, routine.getSecurityType());</span>
+<span class="fc" id="L50">        DOMUtil.appendAttribute(routineElement, &quot;deterministic&quot;, Boolean.toString(routine.isDeterministic()));</span>
+<span class="fc" id="L51">        Element commentElement = routinesElement.getOwnerDocument().createElement(&quot;comment&quot;);</span>
+<span class="fc" id="L52">        routineElement.appendChild(commentElement);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (notNullOrEmpty(routine.getComment())) {</span>
+<span class="fc" id="L54">           CDATASection commentCDATA = routinesElement.getOwnerDocument().createCDATASection(routine.getComment());</span>
+<span class="fc" id="L55">           commentElement.appendChild(commentCDATA);</span>
+        }
+<span class="fc" id="L57">        Element definitionElement = routinesElement.getOwnerDocument().createElement(&quot;definition&quot;);</span>
+<span class="fc" id="L58">        routineElement.appendChild(definitionElement);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (notNullOrEmpty(routine.getDefinitionLanguage())) {</span>
+<span class="fc" id="L60">            DOMUtil.appendAttribute(definitionElement, &quot;language&quot;, routine.getDefinitionLanguage());</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (notNullOrEmpty(routine.getDefinition())) {</span>
+<span class="fc" id="L63">            CDATASection definitionCDATA = routinesElement.getOwnerDocument().createCDATASection(routine.getDefinition());</span>
+<span class="fc" id="L64">            definitionElement.appendChild(definitionCDATA);</span>
+        }
+<span class="fc" id="L66">        Element parametersElement = routineElement.getOwnerDocument().createElement(&quot;parameters&quot;);</span>
+<span class="fc" id="L67">        routineElement.appendChild(parametersElement);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!routine.getParameters().isEmpty()) {</span>
+<span class="fc" id="L69">            appendParameters(parametersElement, routine.getParameters());</span>
+        }
+<span class="fc" id="L71">    }</span>
+
+    private static void appendParameters(Element parametersElement, List&lt;RoutineParameter&gt; routineParameters) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (RoutineParameter parameter : routineParameters) {</span>
+<span class="fc" id="L75">            Element parameterElement = parametersElement.getOwnerDocument().createElement(&quot;parameter&quot;);</span>
+<span class="fc" id="L76">            parametersElement.appendChild(parameterElement);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (notNullOrEmpty(parameter.getName())) {</span>
+<span class="fc" id="L78">                DOMUtil.appendAttribute(parameterElement, &quot;name&quot;, parameter.getName());</span>
+            }
+<span class="fc" id="L80">            DOMUtil.appendAttribute(parameterElement, &quot;type&quot; , parameter.getType());</span>
+<span class="fc" id="L81">            DOMUtil.appendAttribute(parameterElement, &quot;mode&quot; , parameter.getMode());</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
+
+    private static boolean notNullOrEmpty(String string) {
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        return string != null &amp;&amp; !string.isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

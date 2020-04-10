@@ -1,0 +1,593 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">DatabaseService.java</span></div><h1>DatabaseService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011, 2014 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Ismail Simsek
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.Config;
+import org.schemaspy.input.dbms.service.helper.BasicTableMeta;
+import org.schemaspy.input.dbms.service.helper.RemoteTableIdentifier;
+import org.schemaspy.input.dbms.xml.SchemaMeta;
+import org.schemaspy.input.dbms.xml.TableMeta;
+import org.schemaspy.model.*;
+import org.schemaspy.validator.NameValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+import java.util.regex.Pattern;
+
+import static org.schemaspy.input.dbms.service.ColumnLabel.COLUMN_NAME;
+import static org.schemaspy.input.dbms.service.ColumnLabel.TABLE_NAME;
+/**
+ * Created by rkasa on 2016-12-10.
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class DatabaseService {
+
+    private static final long THIRTY_MINUTES = 1000L*60L*30L;
+
+    private final Clock clock;
+
+    private final SqlService sqlService;
+
+    private final TableService tableService;
+    private final ViewService viewService;
+    private final RoutineService routineService;
+    private final SequenceService sequenceService;
+
+
+<span class="fc" id="L72">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L74">    public DatabaseService(Clock clock, SqlService sqlService, TableService tableService, ViewService viewService, RoutineService routineService, SequenceService sequenceService) {</span>
+<span class="fc" id="L75">        this.clock = Objects.requireNonNull(clock);</span>
+<span class="fc" id="L76">        this.sqlService = Objects.requireNonNull(sqlService);</span>
+<span class="fc" id="L77">        this.tableService = Objects.requireNonNull(tableService);</span>
+<span class="fc" id="L78">        this.viewService = Objects.requireNonNull(viewService);</span>
+<span class="fc" id="L79">        this.routineService = Objects.requireNonNull(routineService);</span>
+<span class="fc" id="L80">        this.sequenceService = Objects.requireNonNull(sequenceService);</span>
+<span class="fc" id="L81">    }</span>
+
+    public void gatherSchemaDetails(Config config, Database db, SchemaMeta schemaMeta, ProgressListener listener) throws SQLException {
+<span class="fc" id="L84">        LOGGER.info(&quot;Gathering schema details&quot;);</span>
+
+<span class="fc" id="L86">        listener.startedGatheringDetails();</span>
+
+<span class="fc" id="L88">        DatabaseMetaData meta = sqlService.getDatabaseMetaData();</span>
+
+<span class="fc" id="L90">        initTables(config, db, listener, meta);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (config.isViewsEnabled())</span>
+<span class="fc" id="L92">            initViews(config, db, listener, meta);</span>
+        
+<span class="fc" id="L94">        initCatalogs(db);</span>
+<span class="fc" id="L95">        initSchemas(db);</span>
+
+<span class="fc" id="L97">        initCheckConstraints(config, db);</span>
+<span class="fc" id="L98">        tableService.gatherTableIds(config, db);</span>
+<span class="fc" id="L99">        initIndexIds(config, db);</span>
+<span class="fc" id="L100">        tableService.gatherTableComments(config, db);</span>
+<span class="fc" id="L101">        tableService.gatherTableColumnComments(config, db);</span>
+<span class="fc" id="L102">        viewService.gatherViewComments(config, db);</span>
+<span class="fc" id="L103">        viewService.gatherViewColumnComments(config, db);</span>
+<span class="fc" id="L104">        initColumnTypes(config, db);</span>
+<span class="fc" id="L105">        routineService.gatherRoutines(config, db);</span>
+<span class="fc" id="L106">        sequenceService.gatherSequences(config, db);</span>
+
+<span class="fc" id="L108">        listener.startedConnectingTables();</span>
+
+<span class="fc" id="L110">        connectTables(db, listener);</span>
+<span class="fc" id="L111">        updateFromXmlMetadata(db, schemaMeta);</span>
+<span class="fc" id="L112">    }</span>
+    
+    private void initCatalogs(Database db) throws SQLException {
+
+<span class="fc" id="L116">            String sql = Config.getInstance().getDbProperties().getProperty(&quot;selectCatalogsSql&quot;);</span>
+
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">            if (sql != null &amp;&amp; db.getCatalog() != null) {</span>
+<span class="fc" id="L119">                try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="fc" id="L120">                     ResultSet rs = stmt.executeQuery()) {</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                    if (rs.next()) {</span>
+<span class="fc" id="L122">                         db.getCatalog().setComment(rs.getString(&quot;catalog_comment&quot;));</span>
+                    }
+<span class="nc" id="L124">                } catch (SQLException sqlException) {</span>
+<span class="nc" id="L125">                    LOGGER.error(&quot;Failed to retrieve comment for catalog '{}' using SQL '{}'&quot;, db.getCatalog().getName(), sql, sqlException);</span>
+<span class="fc" id="L126">                }</span>
+            }
+<span class="fc" id="L128">    }</span>
+
+    private void initSchemas(Database db) throws SQLException {
+<span class="fc" id="L131">    	  String sql = Config.getInstance().getDbProperties().getProperty(&quot;selectSchemasSql&quot;);</span>
+
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">          if (sql != null &amp;&amp;  db.getSchema() != null) {</span>
+<span class="fc" id="L134">              try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="fc" id="L135">                   ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                  if (rs.next()) {</span>
+<span class="fc" id="L138">                       db.getSchema().setComment(rs.getString(&quot;schema_comment&quot;));</span>
+                  }
+<span class="nc" id="L140">              } catch (SQLException sqlException) {</span>
+<span class="nc" id="L141">                  LOGGER.error(&quot;Failed to retrieve comment for schema '{}' using SQL '{}'&quot;, db.getSchema().getName(), sql, sqlException);</span>
+<span class="fc" id="L142">              }</span>
+          }
+<span class="fc" id="L144">    }</span>
+
+    /**
+     * Create/initialize any tables in the schema.
+
+     * @param metadata
+     * @throws SQLException
+     */
+    private void initTables(Config config, Database db, ProgressListener listener, final DatabaseMetaData metadata) throws SQLException {
+<span class="fc" id="L153">        final Pattern include = config.getTableInclusions();</span>
+<span class="fc" id="L154">        final Pattern exclude = config.getTableExclusions();</span>
+<span class="fc" id="L155">        final int maxThreads = config.getMaxDbThreads();</span>
+
+<span class="fc" id="L157">        String[] types = getTypes(config, &quot;tableTypes&quot;, &quot;TABLE&quot;);</span>
+<span class="fc" id="L158">        NameValidator validator = new NameValidator(&quot;table&quot;, include, exclude, types);</span>
+<span class="fc" id="L159">        List&lt;BasicTableMeta&gt; entries = getBasicTableMeta(config, db, metadata, true, types);</span>
+
+        TableCreator creator;
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (maxThreads == 1) {</span>
+<span class="fc" id="L163">            creator = new TableCreator();</span>
+        } else {
+            // creating tables takes a LONG time (based on JProbe analysis),
+            // so attempt to speed it up by doing several in parallel.
+            // note that it's actually DatabaseMetaData.getIndexInfo() that's expensive
+
+<span class="fc" id="L169">            creator = new ThreadedTableCreator(maxThreads);</span>
+
+            // &quot;prime the pump&quot; so if there's a database problem we'll probably see it now
+            // and not in a secondary thread
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            while (!entries.isEmpty()) {</span>
+<span class="fc" id="L174">                BasicTableMeta entry = entries.remove(0);</span>
+
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                if (validator.isValid(entry.getName(), entry.getType())) {</span>
+<span class="fc" id="L177">                    new TableCreator().create(db, entry, listener);</span>
+<span class="fc" id="L178">                    break;</span>
+                }
+<span class="nc" id="L180">            }</span>
+        }
+
+        // kick off the secondary threads to do the creation in parallel
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (BasicTableMeta entry : entries) {</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            if (validator.isValid(entry.getName(), entry.getType())) {</span>
+<span class="fc" id="L186">                creator.create(db, entry, listener);</span>
+            }
+<span class="fc" id="L188">        }</span>
+
+        // wait for everyone to finish
+<span class="fc" id="L191">        creator.join();</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Create/initialize any views in the schema.
+     *
+     * @param metadata
+     * @throws SQLException
+     */
+    private void initViews(Config config, Database db, ProgressListener listener, DatabaseMetaData metadata) throws SQLException {
+<span class="fc" id="L201">        Pattern includeTables = config.getTableInclusions();</span>
+<span class="fc" id="L202">        Pattern excludeTables = config.getTableExclusions();</span>
+
+<span class="fc" id="L204">        String[] types = getTypes(config, &quot;viewTypes&quot;, &quot;VIEW&quot;);</span>
+<span class="fc" id="L205">        NameValidator validator = new NameValidator(&quot;view&quot;, includeTables, excludeTables, types);</span>
+
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (BasicTableMeta entry : getBasicTableMeta(config, db, metadata, false, types)) {</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (validator.isValid(entry.getName(), entry.getType())) {</span>
+<span class="fc" id="L209">                View view = new View(db, entry.getCatalog(), entry.getSchema(), entry.getName(),</span>
+<span class="fc" id="L210">                        entry.getRemarks(), entry.getViewDefinition());</span>
+<span class="fc" id="L211">                viewService.gatherViewsDetails(db, view);</span>
+<span class="fc" id="L212">                listener.gatheringDetailsProgressed(view);</span>
+<span class="fc" id="L213">                LOGGER.debug(&quot;Found details of view {}&quot;, view.getName());</span>
+            }
+<span class="fc" id="L215">        }</span>
+<span class="fc" id="L216">    }</span>
+
+    /**
+     * Return a database-specific array of types from the .properties file
+     * with the specified property name.
+     *
+     * @param propName
+     * @param defaultValue
+     * @return
+     */
+    private static String[] getTypes(Config config, String propName, String defaultValue) {
+<span class="fc" id="L227">        String value = config.getDbProperties().getProperty(propName, defaultValue);</span>
+<span class="fc" id="L228">        List&lt;String&gt; types = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (String type : value.split(&quot;,&quot;)) {</span>
+<span class="fc" id="L230">            type = type.trim();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (type.length() &gt; 0)</span>
+<span class="fc" id="L232">                types.add(type);</span>
+        }
+
+<span class="fc" id="L235">        return types.toArray(new String[types.size()]);</span>
+    }
+
+    /**
+     * Take the supplied XML-based metadata and update our model of the schema with it
+     *
+     * @param schemaMeta
+     * @throws SQLException
+     */
+    private void updateFromXmlMetadata(Database db, SchemaMeta schemaMeta) throws SQLException {
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (Objects.isNull(schemaMeta)) {</span>
+<span class="fc" id="L246">            return;</span>
+        }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (Objects.nonNull(schemaMeta.getComments())) {</span>
+<span class="fc" id="L249">            db.getSchema().setComment(schemaMeta.getComments());</span>
+        }
+
+        // done in three passes:
+        // 1: create any new tables
+        // 2: add/mod columns
+        // 3: connect
+
+        // add the newly defined tables and columns first
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (TableMeta tableMeta : schemaMeta.getTables()) {</span>
+            Table table;
+
+<span class="pc bpc" id="L261" title="1 of 4 branches missed.">            if (tableMeta.getRemoteSchema() != null || tableMeta.getRemoteCatalog() != null) {</span>
+                // will add it if it doesn't already exist
+<span class="fc" id="L263">                table = tableService.addLogicalRemoteTable(db, RemoteTableIdentifier.from(tableMeta), db.getSchema().getName());</span>
+            } else {
+<span class="fc" id="L265">                table = db.getLocals().get(tableMeta.getName());</span>
+
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                if (table == null) {</span>
+                    // new table defined only in XML metadata
+<span class="nc" id="L269">                    table = new LogicalTable(db, db.getCatalog().getName(), db.getSchema().getName(), tableMeta.getName(), tableMeta.getComments());</span>
+<span class="nc" id="L270">                    db.getTablesMap().put(table.getName(), table);</span>
+                }
+            }
+
+<span class="fc" id="L274">            table.update(tableMeta);</span>
+<span class="fc" id="L275">        }</span>
+
+        // then tie the tables together
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (TableMeta tableMeta : schemaMeta.getTables()) {</span>
+            Table table;
+
+<span class="pc bpc" id="L281" title="1 of 4 branches missed.">            if (tableMeta.getRemoteCatalog() != null || tableMeta.getRemoteSchema() != null) {</span>
+<span class="fc" id="L282">                table = db.getRemoteTablesMap().get(db.getRemoteTableKey(tableMeta.getRemoteCatalog(), tableMeta.getRemoteSchema(), tableMeta.getName()));</span>
+            } else {
+<span class="fc" id="L284">                table = db.getLocals().get(tableMeta.getName());</span>
+            }
+
+<span class="fc" id="L287">            tableService.connect(db, table, tableMeta, db.getLocals());</span>
+<span class="fc" id="L288">        }</span>
+<span class="fc" id="L289">    }</span>
+
+    private void connectTables(Database db, ProgressListener listener) throws SQLException {
+<span class="fc" id="L292">        Instant startTables = clock.instant();</span>
+<span class="fc" id="L293">        Duration durationOneTable = null;</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        for (Table table : db.getTables()) {</span>
+<span class="fc" id="L295">            listener.connectingTablesProgressed(table);</span>
+
+<span class="fc" id="L297">            tableService.connectForeignKeys(db, table, db.getLocals());</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (Objects.isNull(durationOneTable)) {</span>
+<span class="fc" id="L299">                durationOneTable = Duration.between(startTables, clock.instant());</span>
+<span class="fc" id="L300">                long timeLeft = durationOneTable.toMillis()*(db.getTables().size()-1);</span>
+<span class="pc bpc" id="L301" title="3 of 4 branches missed.">                if (timeLeft &gt; THIRTY_MINUTES &amp;&amp; Config.getInstance().isExportedKeysEnabled()) {</span>
+<span class="nc" id="L302">                    String remaining = DurationFormatter.formatMS(timeLeft);</span>
+<span class="nc" id="L303">                    LOGGER.info(&quot;Estimated time remaining for connecting tables is {}, most time might be spent in getExportedKeys, you can disable getExportedKeys with `-noexportedkeys`. The implication of this is that you won't get cross schema relationships where table in analysis is FK, and the remote schema isn't analyzed&quot;, remaining);</span>
+                }
+            }
+<span class="fc" id="L306">        }</span>
+<span class="fc" id="L307">        Instant startViews = clock.instant();</span>
+<span class="fc" id="L308">        Duration durationOneView = null;</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (Table view : db.getViews()) {</span>
+<span class="fc" id="L310">            listener.connectingTablesProgressed(view);</span>
+
+<span class="fc" id="L312">            tableService.connectForeignKeys(db, view, db.getLocals());</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (Objects.isNull(durationOneView)) {</span>
+<span class="fc" id="L314">                durationOneView = Duration.between(startViews, clock.instant());</span>
+<span class="fc" id="L315">                long timeLeft = durationOneView.toMillis()*(db.getViews().size()-1);</span>
+<span class="pc bpc" id="L316" title="3 of 4 branches missed.">                if (timeLeft &gt; THIRTY_MINUTES &amp;&amp; Config.getInstance().isExportedKeysEnabled()) {</span>
+<span class="nc" id="L317">                    String remaining = DurationFormatter.formatMS(timeLeft);</span>
+<span class="nc" id="L318">                    LOGGER.info(&quot;Estimated time remaining for connecting views is {}, most time might be spent in getExportedKeys, you can disable getExportedKeys with `-noexportedkeys`. The implication of this is that you won't get cross schema relationships where table in analysis is FK, and the remote schema isn't analyzed&quot;, remaining);</span>
+                }
+            }
+<span class="fc" id="L321">        }</span>
+<span class="fc" id="L322">    }</span>
+
+    /**
+     * Single-threaded implementation of a class that creates tables
+     */
+<span class="fc" id="L327">    private class TableCreator {</span>
+        /**
+         * Create a table and put it into &lt;code&gt;tables&lt;/code&gt;
+         */
+        void create(Database db, BasicTableMeta tableMeta, ProgressListener listener) throws SQLException {
+<span class="fc" id="L332">            createImpl(db, tableMeta, listener);</span>
+<span class="fc" id="L333">        }</span>
+
+        protected void createImpl(Database db, BasicTableMeta tableMeta, ProgressListener listener) throws SQLException {
+<span class="fc" id="L336">            Table table = new Table(db, tableMeta.getCatalog(), tableMeta.getSchema(), tableMeta.getName(), tableMeta.getRemarks());</span>
+<span class="fc" id="L337">            tableService.gatheringTableDetails(db, table);</span>
+
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            if (tableMeta.getNumRows() != -1) {</span>
+<span class="fc" id="L340">                table.setNumRows(tableMeta.getNumRows());</span>
+            }
+
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            if (table.getNumRows() == 0) {</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                long numRows = Config.getInstance().isNumRowsEnabled() ? tableService.fetchNumRows(db, table) : -1;</span>
+<span class="fc" id="L345">                table.setNumRows(numRows);</span>
+            }
+
+<span class="fc" id="L348">            synchronized (db.getTablesMap()) {</span>
+<span class="fc" id="L349">                db.getTablesMap().put(table.getName(), table);</span>
+<span class="fc" id="L350">            }</span>
+
+<span class="fc" id="L352">            listener.gatheringDetailsProgressed(table);</span>
+
+<span class="fc" id="L354">            LOGGER.debug(&quot;Retrieved details of {}&quot;, table.getFullName());</span>
+<span class="fc" id="L355">        }</span>
+
+        void join() {
+            /**
+             * Wait for all of the tables to be created.
+             * By default this does nothing since this implementation isn't threaded.
+             */
+<span class="fc" id="L362">        }</span>
+    }
+
+    /**
+     * Multi-threaded implementation of a class that creates tables
+     */
+    private class ThreadedTableCreator extends TableCreator {
+<span class="fc" id="L369">        private final Set&lt;Thread&gt; threads = new HashSet&lt;&gt;();</span>
+        private final int maxThreads;
+
+<span class="fc" id="L372">        ThreadedTableCreator(int maxThreads) {</span>
+<span class="fc" id="L373">            this.maxThreads = maxThreads;</span>
+<span class="fc" id="L374">        }</span>
+
+        @Override
+        void create(Database db, BasicTableMeta tableMeta, ProgressListener listener) {
+<span class="fc" id="L378">            Thread runner = new Thread() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="fc" id="L382">                        createImpl(db, tableMeta, listener);</span>
+<span class="nc" id="L383">                    } catch (SQLException exc) {</span>
+<span class="nc" id="L384">                        LOGGER.error(&quot;SQL exception&quot;,exc);</span>
+                    } finally {
+<span class="fc" id="L386">                        synchronized (threads) {</span>
+<span class="fc" id="L387">                            threads.remove(this);</span>
+<span class="fc" id="L388">                            threads.notifyAll();</span>
+<span class="fc" id="L389">                        }</span>
+                    }
+<span class="fc" id="L391">                }</span>
+            };
+
+<span class="fc" id="L394">            synchronized (threads) {</span>
+                // wait for enough 'room'
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">                while (threads.size() &gt;= maxThreads) {</span>
+                    try {
+<span class="nc" id="L398">                        threads.wait();</span>
+<span class="nc" id="L399">                    } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L400">                        Thread.currentThread().interrupt();</span>
+<span class="nc" id="L401">                    }</span>
+                }
+
+<span class="fc" id="L404">                threads.add(runner);</span>
+<span class="fc" id="L405">            }</span>
+
+<span class="fc" id="L407">            runner.start();</span>
+<span class="fc" id="L408">        }</span>
+
+        /**
+         * Wait for all of the started threads to complete
+         */
+        @Override
+        public void join() {
+            while (true) {
+                Thread thread;
+
+<span class="fc" id="L418">                synchronized (threads) {</span>
+<span class="fc" id="L419">                    Iterator&lt;Thread&gt; iter = threads.iterator();</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">                    if (!iter.hasNext())</span>
+<span class="fc" id="L421">                        break;</span>
+
+<span class="fc" id="L423">                    thread = iter.next();</span>
+<span class="fc" id="L424">                }</span>
+
+                try {
+<span class="fc" id="L427">                    thread.join();</span>
+<span class="nc" id="L428">                } catch (InterruptedException exc) {</span>
+<span class="nc" id="L429">                    Thread.currentThread().interrupt();</span>
+<span class="fc" id="L430">                }</span>
+<span class="fc" id="L431">            }</span>
+<span class="fc" id="L432">        }</span>
+    }
+
+    /**
+     * Return a list of basic details of the tables in the schema.
+     *
+     * @param metadata
+     * @param forTables true if we're getting table data, false if getting view data
+     * @return
+     * @throws SQLException
+     */
+    private List&lt;BasicTableMeta&gt; getBasicTableMeta(Config config,
+                                                   Database db,
+                                                   DatabaseMetaData metadata,
+                                                   boolean forTables,
+                                                   String... types) throws SQLException {
+<span class="fc" id="L448">        List&lt;BasicTableMeta&gt; basics = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (!getBasicTableMetaFromSql(basics, config, db, forTables)) {</span>
+<span class="fc" id="L450">            getBasicTableMetaFromDatabaseMetaData(basics, metadata, db, forTables, types);</span>
+        }
+<span class="fc" id="L452">        return basics;</span>
+    }
+    private boolean getBasicTableMetaFromSql(List&lt;BasicTableMeta&gt; basics, Config config, Database database, boolean forTables) {
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        String queryName = forTables ? &quot;selectTablesSql&quot; : &quot;selectViewsSql&quot;;</span>
+<span class="fc" id="L456">        String sql = config.getDbProperties().getProperty(queryName);</span>
+
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (sql != null) {</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            String clazz = forTables ? &quot;table&quot; : &quot;view&quot;;</span>
+<span class="fc" id="L460">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, database, null);</span>
+<span class="fc" id="L461">                 ResultSet rs = stmt.executeQuery()) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                while (rs.next()) {</span>
+<span class="fc" id="L463">                    basics.add(basicTableMetaFromResultSetRow(rs, forTables, clazz, database.getSchema().getName()));</span>
+                }
+<span class="fc" id="L465">                return true;</span>
+<span class="nc" id="L466">            } catch (SQLException sqlException) {</span>
+<span class="nc" id="L467">                LOGGER.warn(&quot;Failed to retrieve '{}' names with custom SQL '{}&quot;, clazz, sql, sqlException);</span>
+            }
+        }
+<span class="fc" id="L470">        basics.clear();</span>
+<span class="fc" id="L471">        return false;</span>
+    }
+
+    private static BasicTableMeta basicTableMetaFromResultSetRow(ResultSet rs, boolean forTables, String clazz, String schemaName) throws SQLException {
+<span class="fc" id="L475">        String name = rs.getString(clazz + &quot;_name&quot;);</span>
+<span class="fc" id="L476">        String cat = getOptionalString(rs, clazz + &quot;_catalog&quot;);</span>
+<span class="fc" id="L477">        String sch = getOptionalString(rs, clazz + &quot;_schema&quot;);</span>
+<span class="pc bpc" id="L478" title="3 of 4 branches missed.">        if (cat == null &amp;&amp; sch == null)</span>
+<span class="nc" id="L479">            sch = schemaName;</span>
+<span class="fc" id="L480">        String remarks = getOptionalString(rs, clazz + &quot;_comment&quot;);</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        String viewDefinition = forTables ? null : getOptionalString(rs, &quot;view_definition&quot;);</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        String rows = forTables ? getOptionalString(rs, &quot;table_rows&quot;) : null;</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        long numRows = rows == null ? -1 : Long.parseLong(rows);</span>
+<span class="fc" id="L484">        return new BasicTableMeta(cat, sch, name, clazz, remarks, viewDefinition, numRows);</span>
+    }
+
+    private static void getBasicTableMetaFromDatabaseMetaData(List&lt;BasicTableMeta&gt; basics, DatabaseMetaData databaseMetaData, Database database, boolean forTables, String... types) throws SQLException {
+<span class="fc" id="L488">        String lastTableName = null;</span>
+<span class="fc" id="L489">        try (ResultSet rs = databaseMetaData.getTables(null, database.getSchema().getName(), &quot;%&quot;, types)){</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">            while (rs.next()) {</span>
+<span class="fc" id="L491">                String name = rs.getString(&quot;TABLE_NAME&quot;);</span>
+<span class="fc" id="L492">                lastTableName = name;</span>
+<span class="fc" id="L493">                String type = rs.getString(&quot;TABLE_TYPE&quot;);</span>
+<span class="fc" id="L494">                String cat = rs.getString(&quot;TABLE_CAT&quot;);</span>
+<span class="fc" id="L495">                String schem = rs.getString(&quot;TABLE_SCHEM&quot;);</span>
+<span class="fc" id="L496">                String remarks = getOptionalString(rs, &quot;REMARKS&quot;);</span>
+
+<span class="fc" id="L498">                basics.add(new BasicTableMeta(cat, schem, name, type, remarks, null, -1));</span>
+<span class="fc" id="L499">            }</span>
+<span class="nc" id="L500">        } catch (SQLException exc) {</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">            if (forTables)</span>
+<span class="nc" id="L502">                throw exc;</span>
+<span class="nc" id="L503">            LOGGER.warn(&quot;Ignoring view '{}' due to exception&quot;, lastTableName, exc);</span>
+<span class="fc" id="L504">        }</span>
+<span class="fc" id="L505">    }</span>
+
+    /**
+     * Some databases don't play nice with their metadata.
+     * E.g. Oracle doesn't have a REMARKS column at all.
+     * This method ignores those types of failures, replacing them with null.
+     */
+    private static String getOptionalString(ResultSet rs, String columnName) {
+        try {
+<span class="fc" id="L514">            return rs.getString(columnName);</span>
+<span class="nc" id="L515">        } catch (SQLException ignore) { //NOSONAR</span>
+<span class="nc" id="L516">            return null;</span>
+        }
+    }
+
+    private void initCheckConstraints(Config config, Database db) {
+<span class="fc" id="L521">        String sql = config.getDbProperties().getProperty(&quot;selectCheckConstraintsSql&quot;);</span>
+<span class="fc" id="L522">        boolean append = Boolean.parseBoolean(config.getDbProperties().getProperty(&quot;multirowdata&quot;, &quot;false&quot;));</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">        if (sql != null) {</span>
+<span class="fc" id="L524">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db,null);</span>
+<span class="fc" id="L525">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="fc bfc" id="L527" title="All 2 branches covered.">                while (rs.next()) {</span>
+<span class="fc" id="L528">                    String tableName = rs.getString(TABLE_NAME);</span>
+<span class="fc" id="L529">                    Table table = db.getLocals().get(tableName);</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                    if (table != null) {</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">                        if (append) {</span>
+<span class="nc" id="L532">                            table.getCheckConstraints().merge(rs.getString(&quot;constraint_name&quot;), rs.getString(&quot;text&quot;), (oldValue, newValue) -&gt; oldValue + newValue);</span>
+                        } else {
+<span class="fc" id="L534">                            table.getCheckConstraints().put(rs.getString(&quot;constraint_name&quot;), rs.getString(&quot;text&quot;));</span>
+                        }
+                    }
+<span class="fc" id="L537">                }</span>
+<span class="nc" id="L538">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L540">                LOGGER.warn(&quot;Failed to retrieve check constraints using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="fc" id="L541">            }</span>
+        }
+<span class="fc" id="L543">    }</span>
+
+    private void initColumnTypes(Config config, Database db) {
+<span class="fc" id="L546">        String sql = config.getDbProperties().getProperty(&quot;selectColumnTypesSql&quot;);</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        if (sql != null) {</span>
+
+<span class="fc" id="L549">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="fc" id="L550">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="fc bfc" id="L552" title="All 2 branches covered.">                while (rs.next()) {</span>
+<span class="fc" id="L553">                    String tableName = rs.getString(TABLE_NAME);</span>
+<span class="fc" id="L554">                    Table table = db.getLocals().get(tableName);</span>
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                    if (table != null) {</span>
+<span class="fc" id="L556">                        String columnName = rs.getString(COLUMN_NAME);</span>
+<span class="fc" id="L557">                        TableColumn column = table.getColumn(columnName);</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                        if (column != null) {</span>
+<span class="fc" id="L559">                            column.setTypeName(rs.getString(&quot;column_type&quot;));</span>
+<span class="fc" id="L560">                            column.setShortType(getOptionalString(rs, &quot;short_column_type&quot;));</span>
+                        }
+                    }
+<span class="fc" id="L563">                }</span>
+<span class="nc" id="L564">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L566">                LOGGER.warn(&quot;Failed to retrieve column type details using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="fc" id="L567">            }</span>
+        }
+<span class="fc" id="L569">    }</span>
+
+    private void initIndexIds(Config config, Database db) throws SQLException {
+<span class="fc" id="L572">        String sql = config.getDbProperties().getProperty(&quot;selectIndexIdsSql&quot;);</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        if (sql != null) {</span>
+
+<span class="nc" id="L575">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="nc" id="L576">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="nc bnc" id="L578" title="All 2 branches missed.">                while (rs.next()) {</span>
+<span class="nc" id="L579">                    String tableName = rs.getString(TABLE_NAME);</span>
+<span class="nc" id="L580">                    Table table = db.getLocals().get(tableName);</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">                    if (table != null) {</span>
+<span class="nc" id="L582">                        TableIndex index = table.getIndex(rs.getString(&quot;index_name&quot;));</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">                        if (index != null)</span>
+<span class="nc" id="L584">                            index.setId(rs.getObject(&quot;index_id&quot;));</span>
+                    }
+<span class="nc" id="L586">                }</span>
+<span class="nc" id="L587">            } catch (SQLException sqlException) {</span>
+<span class="nc" id="L588">                LOGGER.warn(&quot;Failed to fetch index ids using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="nc" id="L589">            }</span>
+        }
+<span class="fc" id="L591">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

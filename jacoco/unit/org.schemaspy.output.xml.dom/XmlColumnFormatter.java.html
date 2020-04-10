@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlColumnFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.xml.dom</a> &gt; <span class="el_source">XmlColumnFormatter.java</span></div><h1>XmlColumnFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017 - 2019 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.xml.dom;
+
+import org.schemaspy.model.ForeignKeyConstraint;
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+
+import java.nio.charset.StandardCharsets;
+import java.sql.Types;
+import java.util.regex.Pattern;
+
+import static org.schemaspy.output.xml.dom.XmlConstants.*;
+
+/**
+ * Formats {@link TableColumn}s into an XML DOM tree.
+ *
+ * @author John Currier
+ * @author Nils Petzaell
+ */
+<span class="fc" id="L43">public class XmlColumnFormatter {</span>
+    private static final int DEFAULT_JDBC_TYPE_CODE = Types.VARCHAR;
+
+    // valid chars came from http://www.w3.org/TR/REC-xml/#charsets
+    // and attempting to match 0x10000-0x10FFFF with the \p Unicode escapes
+    // (from http://www.regular-expressions.info/unicode.html)
+<span class="fc" id="L49">    private static final Pattern validXmlChars =</span>
+<span class="fc" id="L50">            Pattern.compile(&quot;^[ -\uD7FF\uE000-\uFFFD\\p{L}\\p{M}\\p{Z}\\p{S}\\p{N}\\p{P}]*$&quot;);</span>
+
+    /**
+     * Append all columns in the table to the XML node
+     *
+     * @param tableNode
+     * @param table
+     */
+    public void appendColumns(Element tableNode, Table table) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        for (TableColumn column : table.getColumns()) {</span>
+<span class="nc" id="L60">            appendColumn(tableNode, column);</span>
+<span class="nc" id="L61">        }</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Append column details to the XML node
+     *
+     * @param tableNode
+     * @param column
+     * @return
+     */
+    public Node appendColumn(Node tableNode, TableColumn column) {
+<span class="fc" id="L72">        Document document = tableNode.getOwnerDocument();</span>
+<span class="fc" id="L73">        Node columnNode = document.createElement(COLUMN);</span>
+<span class="fc" id="L74">        tableNode.appendChild(columnNode);</span>
+
+<span class="fc" id="L76">        DOMUtil.appendAttribute(columnNode, &quot;id&quot;, String.valueOf(column.getId()));</span>
+<span class="fc" id="L77">        DOMUtil.appendAttribute(columnNode, &quot;name&quot;, column.getName());</span>
+<span class="fc" id="L78">        DOMUtil.appendAttribute(columnNode, &quot;type&quot;, column.getTypeName());</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        DOMUtil.appendAttribute(columnNode, &quot;typeCode&quot;, String.valueOf(column.getType() == null ?</span>
+<span class="fc" id="L80">                DEFAULT_JDBC_TYPE_CODE : column.getType()));</span>
+<span class="fc" id="L81">        DOMUtil.appendAttribute(columnNode, &quot;defaultValue&quot;, String.valueOf(column.getDefaultValue()));</span>
+<span class="fc" id="L82">        DOMUtil.appendAttribute(columnNode, &quot;size&quot;, String.valueOf(column.getLength()));</span>
+<span class="fc" id="L83">        DOMUtil.appendAttribute(columnNode, &quot;digits&quot;, String.valueOf(column.getDecimalDigits()));</span>
+<span class="fc" id="L84">        DOMUtil.appendAttribute(columnNode, &quot;nullable&quot;, String.valueOf(column.isNullable()));</span>
+<span class="fc" id="L85">        DOMUtil.appendAttribute(columnNode, &quot;autoUpdated&quot;, String.valueOf(column.isAutoUpdated()));</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (column.getDefaultValue() != null) {</span>
+<span class="fc" id="L87">            String defaultValue = column.getDefaultValue().toString();</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (isBinary(defaultValue)) {</span>
+                // we're run into a binary default value, convert it to its hex equivalent
+<span class="nc" id="L90">                defaultValue = asBinary(defaultValue);</span>
+                // and indicate that it's been converted
+<span class="nc" id="L92">                DOMUtil.appendAttribute(columnNode, &quot;defaultValueIsBinary&quot;, &quot;true&quot;);</span>
+            }
+<span class="fc" id="L94">            DOMUtil.appendAttribute(columnNode, &quot;defaultValue&quot;, defaultValue);</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        DOMUtil.appendAttribute(columnNode, &quot;remarks&quot;, column.getComments() == null ? &quot;&quot; : column.getComments());</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (TableColumn childColumn : column.getChildren()) {</span>
+<span class="fc" id="L99">            Node childNode = document.createElement(&quot;child&quot;);</span>
+<span class="fc" id="L100">            columnNode.appendChild(childNode);</span>
+<span class="fc" id="L101">            appendForeignKeyAttributes(childNode, childColumn, column.getChildConstraint(childColumn));</span>
+<span class="fc" id="L102">        }</span>
+
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (TableColumn parentColumn : column.getParents()) {</span>
+<span class="fc" id="L105">            Node parentNode = document.createElement(&quot;parent&quot;);</span>
+<span class="fc" id="L106">            columnNode.appendChild(parentNode);</span>
+<span class="fc" id="L107">            appendForeignKeyAttributes(parentNode, parentColumn, column.getParentConstraint(parentColumn));</span>
+<span class="fc" id="L108">        }</span>
+
+<span class="fc" id="L110">        return columnNode;</span>
+    }
+
+    private static void appendForeignKeyAttributes(Node node, TableColumn column, ForeignKeyConstraint foreignKeyConstraint) {
+<span class="fc" id="L114">        Table table = column.getTable();</span>
+<span class="fc" id="L115">        DOMUtil.appendAttribute(node, &quot;foreignKey&quot;, foreignKeyConstraint.getName());</span>
+<span class="fc" id="L116">        DOMUtil.appendAttribute(node, CATALOG, table.getCatalog());</span>
+<span class="fc" id="L117">        DOMUtil.appendAttribute(node, SCHEMA, table.getSchema());</span>
+<span class="fc" id="L118">        DOMUtil.appendAttribute(node, TABLE, table.getName());</span>
+<span class="fc" id="L119">        DOMUtil.appendAttribute(node, COLUMN, column.getName());</span>
+<span class="fc" id="L120">        DOMUtil.appendAttribute(node, &quot;implied&quot;, String.valueOf(foreignKeyConstraint.isImplied()));</span>
+<span class="fc" id="L121">        DOMUtil.appendAttribute(node, &quot;onDeleteCascade&quot;, String.valueOf(foreignKeyConstraint.isCascadeOnDelete()));</span>
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if the string contains binary data
+     * (chars that are invalid for XML) per http://www.w3.org/TR/REC-xml/#charsets
+     *
+     * @param str
+     * @return
+     */
+    private static boolean isBinary(String str) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        return !validXmlChars.matcher(str).matches();</span>
+    }
+
+    /**
+     * Turns a string into its hex equivalent.
+     * Intended to be used when {@link #isBinary(String)} returns &lt;code&gt;true&lt;/code&gt;.
+     *
+     * @param str
+     * @return
+     */
+    private static String asBinary(String str) {
+<span class="nc" id="L143">        byte[] bytes = str.getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L144">        StringBuilder buf = new StringBuilder(bytes.length * 2);</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        for (byte aByte : bytes) {</span>
+<span class="nc" id="L146">            buf.append(String.format(&quot;%02X&quot;, aByte));</span>
+        }
+<span class="nc" id="L148">        return buf.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

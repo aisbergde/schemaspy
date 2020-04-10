@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RoutineService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">RoutineService.java</span></div><h1>RoutineService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2019 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.Config;
+import org.schemaspy.model.Database;
+import org.schemaspy.model.Routine;
+import org.schemaspy.model.RoutineParameter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Objects;
+
+public class RoutineService {
+<span class="fc" id="L35">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final SqlService sqlService;
+
+<span class="fc" id="L39">    public RoutineService(SqlService sqlService) {</span>
+<span class="fc" id="L40">        this.sqlService = sqlService;</span>
+<span class="fc" id="L41">    }</span>
+
+    public void gatherRoutines(Config config, Database database) {
+<span class="fc" id="L44">        initRoutines(config, database);</span>
+<span class="fc" id="L45">        initRoutineParameters(config, database);</span>
+<span class="fc" id="L46">        database.getRoutinesMap().replaceAll((routineName, routine) -&gt; {</span>
+<span class="fc" id="L47">            Routine newRoutine = new Routine(</span>
+<span class="fc" id="L48">                    routine.getName(),</span>
+<span class="fc" id="L49">                    trim(routine.getType()),</span>
+<span class="fc" id="L50">                    trim(routine.getReturnType()),</span>
+<span class="fc" id="L51">                    trim(routine.getDefinitionLanguage()),</span>
+<span class="fc" id="L52">                    trim(routine.getDefinition()),</span>
+<span class="fc" id="L53">                    routine.isDeterministic(),</span>
+<span class="fc" id="L54">                    trim(routine.getDataAccess()),</span>
+<span class="fc" id="L55">                    trim(routine.getSecurityType()),</span>
+<span class="fc" id="L56">                    trim(routine.getComment()));</span>
+<span class="fc" id="L57">            routine.getParameters().forEach(newRoutine::addParameter);</span>
+<span class="fc" id="L58">            return newRoutine;</span>
+        });
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Initializes stored procedures / functions.
+     *
+     * @throws SQLException
+     */
+    private void initRoutines(Config config, Database db) {
+<span class="fc" id="L68">        String sql = config.getDbProperties().getProperty(&quot;selectRoutinesSql&quot;);</span>
+<span class="fc" id="L69">        boolean append = Boolean.parseBoolean(config.getDbProperties().getProperty(&quot;multirowdata&quot;, &quot;false&quot;));</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (sql != null) {</span>
+
+<span class="fc" id="L72">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="fc" id="L73">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                while (rs.next()) {</span>
+<span class="fc" id="L76">                    String routineName = rs.getString(&quot;routine_name&quot;);</span>
+<span class="fc" id="L77">                    String routineType = rs.getString(&quot;routine_type&quot;);</span>
+<span class="fc" id="L78">                    String returnType = rs.getString(&quot;dtd_identifier&quot;);</span>
+<span class="fc" id="L79">                    String definitionLanguage = rs.getString(&quot;routine_body&quot;);</span>
+<span class="fc" id="L80">                    String definition = rs.getString(&quot;routine_definition&quot;);</span>
+<span class="fc" id="L81">                    String dataAccess = rs.getString(&quot;sql_data_access&quot;);</span>
+<span class="fc" id="L82">                    String securityType = rs.getString(&quot;security_type&quot;);</span>
+<span class="fc" id="L83">                    boolean deterministic = rs.getBoolean(&quot;is_deterministic&quot;);</span>
+<span class="fc" id="L84">                    String comment = getOptionalString(rs, &quot;routine_comment&quot;);</span>
+<span class="fc" id="L85">                    Routine routine = new Routine(routineName, routineType,</span>
+                            returnType, definitionLanguage, definition,
+                            deterministic, dataAccess, securityType, comment);
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    if (append) {</span>
+<span class="nc" id="L89">                        db.getRoutinesMap().merge(routineName, routine, (oldRoutine, newRoutine) -&gt; new Routine(oldRoutine.getName(), oldRoutine.getType(),</span>
+<span class="nc" id="L90">                                oldRoutine.getReturnType(), oldRoutine.getDefinitionLanguage(), oldRoutine.getDefinition() + newRoutine.getDefinition(),</span>
+<span class="nc" id="L91">                                oldRoutine.isDeterministic(), oldRoutine.getDataAccess(), oldRoutine.getSecurityType(), oldRoutine.getComment()));</span>
+                    } else {
+<span class="fc" id="L93">                        db.getRoutinesMap().put(routineName, routine);</span>
+                    }
+<span class="fc" id="L95">                }</span>
+<span class="nc" id="L96">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L98">                LOGGER.warn(&quot;Failed to retrieve stored procedure/function details using sql '{}'&quot;, sql, sqlException);</span>
+<span class="fc" id="L99">            }</span>
+        }
+<span class="fc" id="L101">    }</span>
+
+    private void initRoutineParameters(Config config, Database db) {
+<span class="fc" id="L104">        String sql = config.getDbProperties().getProperty(&quot;selectRoutineParametersSql&quot;);</span>
+
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (sql != null) {</span>
+
+<span class="fc" id="L108">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="fc" id="L109">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                while (rs.next()) {</span>
+<span class="fc" id="L112">                    String routineName = rs.getString(&quot;specific_name&quot;);</span>
+
+<span class="fc" id="L114">                    Routine routine = db.getRoutinesMap().get(routineName);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                    if (routine != null) {</span>
+<span class="fc" id="L116">                        String paramName = trim(rs.getString(&quot;parameter_name&quot;));</span>
+<span class="fc" id="L117">                        String type = trim(rs.getString(&quot;dtd_identifier&quot;));</span>
+<span class="fc" id="L118">                        String mode = trim(rs.getString(&quot;parameter_mode&quot;));</span>
+
+<span class="fc" id="L120">                        RoutineParameter param = new RoutineParameter(paramName, type, mode);</span>
+<span class="fc" id="L121">                        routine.addParameter(param);</span>
+                    }
+
+<span class="fc" id="L124">                }</span>
+<span class="nc" id="L125">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L127">                LOGGER.warn(&quot;Failed to retrieve stored procedure/function details using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="fc" id="L128">            }</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    private static String getOptionalString(ResultSet rs, String columnName) {
+        try {
+<span class="fc" id="L134">            return rs.getString(columnName);</span>
+<span class="nc" id="L135">        } catch (SQLException sqlException) {</span>
+<span class="nc" id="L136">            LOGGER.debug(&quot;Failed to get value for column '{}'&quot;, sqlException.getMessage(), sqlException);</span>
+<span class="nc" id="L137">            return null;</span>
+        }
+    }
+
+    private static String trim(String string) {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (Objects.isNull(string)) {</span>
+<span class="fc" id="L143">            return null;</span>
+        }
+<span class="fc" id="L145">        return string.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

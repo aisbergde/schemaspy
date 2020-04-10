@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DotTableFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.dot.schemaspy</a> &gt; <span class="el_source">DotTableFormatter.java</span></div><h1>DotTableFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.dot.schemaspy;
+
+import org.schemaspy.model.ForeignKeyConstraint;
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.schemaspy.output.dot.DotConfig;
+import org.schemaspy.view.WriteStats;
+
+import java.io.PrintWriter;
+import java.util.*;
+
+/**
+ * Format table data into .dot format to feed to Graphvis' dot program.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Nils Petzaell
+ */
+public class DotTableFormatter {
+
+    private final DotFormat dotFormat;
+    private final DotConfig dotConfig;
+
+<span class="fc" id="L44">    public DotTableFormatter(DotFormat dotFormat, DotConfig dotConfig) {</span>
+<span class="fc" id="L45">        this.dotFormat = dotFormat;</span>
+<span class="fc" id="L46">        this.dotConfig = dotConfig;</span>
+<span class="fc" id="L47">    }</span>
+
+    /**
+     * Write real relationships (excluding implied) associated with the given table.&lt;p&gt;
+     * Returns a set of the implied constraints that could have been included but weren't.
+     */
+    public Set&lt;ForeignKeyConstraint&gt; writeTableRealRelationships(Table table, boolean twoDegreesOfSeparation, WriteStats stats, PrintWriter dot) {
+<span class="fc" id="L54">        return writeTableRelationships(table, twoDegreesOfSeparation, stats, false, dot);</span>
+    }
+
+    /**
+     * Write implied relationships associated with the given table
+     */
+    public void writeTableAllRelationships(Table table, boolean twoDegreesOfSeparation, WriteStats stats, PrintWriter dot) {
+<span class="fc" id="L61">        writeTableRelationships(table, twoDegreesOfSeparation, stats, true, dot);</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Write relationships associated with the given table.&lt;p&gt;
+     * Returns a set of the implied constraints that could have been included but weren't.
+     */
+    private Set&lt;ForeignKeyConstraint&gt; writeTableRelationships(Table table, boolean twoDegreesOfSeparation, WriteStats stats, boolean includeImplied, PrintWriter dot) {
+<span class="fc" id="L69">        Set&lt;Table&gt; tablesWritten = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L70">        Set&lt;ForeignKeyConstraint&gt; skippedImpliedConstraints = new HashSet&lt;&gt;();</span>
+
+<span class="fc" id="L72">        DotConnectorFinder finder = DotConnectorFinder.getInstance();</span>
+
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        String diagramName = (twoDegreesOfSeparation ? &quot;twoDegreesRelationshipsDiagram&quot; : &quot;oneDegreeRelationshipsDiagram&quot;) + (includeImplied ? &quot;Implied&quot; : &quot;&quot;);</span>
+<span class="fc" id="L75">        dotFormat.writeHeader(diagramName, true, dot);</span>
+
+<span class="fc" id="L77">        Set&lt;Table&gt; relatedTables = getTableImmediateRelatives(table, true, includeImplied, skippedImpliedConstraints);</span>
+
+<span class="fc" id="L79">        Set&lt;DotConnector&gt; connectors = new TreeSet&lt;&gt;(finder.getRelatedConnectors(table, includeImplied));</span>
+<span class="fc" id="L80">        tablesWritten.add(table);</span>
+
+<span class="fc" id="L82">        Map&lt;Table, DotNode&gt; nodes = new TreeMap&lt;&gt;();</span>
+
+        // write immediate relatives first
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (Table relatedTable : relatedTables) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (!tablesWritten.add(relatedTable))</span>
+<span class="nc" id="L87">                continue; // already written</span>
+
+<span class="fc" id="L89">            nodes.put(relatedTable, new DotNode(relatedTable, false, new DotNodeConfig(false, false), dotConfig));</span>
+<span class="fc" id="L90">            connectors.addAll(finder.getRelatedConnectors(relatedTable, table, true, includeImplied));</span>
+<span class="fc" id="L91">        }</span>
+
+        // connect the edges that go directly to the target table
+        // so they go to the target table's type column instead
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (DotConnector connector : connectors) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (connector.pointsTo(table))</span>
+<span class="fc" id="L97">                connector.connectToParentDetails();</span>
+<span class="fc" id="L98">        }</span>
+
+<span class="fc" id="L100">        Set&lt;Table&gt; allCousins = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L101">        Set&lt;DotConnector&gt; allCousinConnectors = new TreeSet&lt;&gt;();</span>
+
+        // next write 'cousins' (2nd degree of separation)
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (twoDegreesOfSeparation) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (Table relatedTable : relatedTables) {</span>
+<span class="fc" id="L106">                Set&lt;Table&gt; cousins = getTableImmediateRelatives(relatedTable, false, includeImplied, skippedImpliedConstraints);</span>
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                for (Table cousin : cousins) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                    if (!tablesWritten.add(cousin))</span>
+<span class="fc" id="L110">                        continue; // already written</span>
+
+<span class="fc" id="L112">                    allCousinConnectors.addAll(finder.getRelatedConnectors(cousin, relatedTable, false, includeImplied));</span>
+<span class="fc" id="L113">                    nodes.put(cousin, new DotNode(cousin, false, new DotNodeConfig(), dotConfig));</span>
+<span class="fc" id="L114">                }</span>
+
+<span class="fc" id="L116">                allCousins.addAll(cousins);</span>
+<span class="fc" id="L117">            }</span>
+        }
+
+        // glue together any 'participants' that aren't yet connected
+        // note that this is the epitome of nested loops from hell
+<span class="fc" id="L122">        List&lt;Table&gt; participants = new ArrayList&lt;&gt;(nodes.keySet());</span>
+<span class="fc" id="L123">        Iterator&lt;Table&gt; iter = participants.iterator();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        while (iter.hasNext()) {</span>
+<span class="fc" id="L125">            Table participantA = iter.next();</span>
+<span class="fc" id="L126">            iter.remove(); // cut down the combos as quickly as possible</span>
+
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (Table participantB : participants) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                for (DotConnector connector : finder.getRelatedConnectors(participantA, participantB, false, includeImplied)) {</span>
+<span class="pc bpc" id="L130" title="2 of 6 branches missed.">                    if (twoDegreesOfSeparation &amp;&amp; (allCousins.contains(participantA) || allCousins.contains(participantB))) {</span>
+<span class="fc" id="L131">                        allCousinConnectors.add(connector);</span>
+                    } else {
+<span class="nc" id="L133">                        connectors.add(connector);</span>
+                    }
+<span class="fc" id="L135">                }</span>
+<span class="fc" id="L136">            }</span>
+<span class="fc" id="L137">        }</span>
+
+<span class="fc" id="L139">        markExcludedColumns(nodes, stats.getExcludedColumns());</span>
+
+        // now directly connect the loose ends to the title of the
+        // 2nd degree of separation tables
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (DotConnector connector : allCousinConnectors) {</span>
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">            if (allCousins.contains(connector.getParentTable()) &amp;&amp; !relatedTables.contains(connector.getParentTable()))</span>
+<span class="fc" id="L145">                connector.connectToParentTitle();</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">            if (allCousins.contains(connector.getChildTable()) &amp;&amp; !relatedTables.contains(connector.getChildTable()))</span>
+<span class="fc" id="L147">                connector.connectToChildTitle();</span>
+<span class="fc" id="L148">        }</span>
+
+        // include the table itself
+<span class="fc" id="L151">        nodes.put(table, new DotNode(table, false, new DotNodeConfig(true, true), dotConfig));</span>
+
+<span class="fc" id="L153">        connectors.addAll(allCousinConnectors);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (DotConnector connector : connectors) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (connector.isImplied()) {</span>
+<span class="fc" id="L156">                DotNode node = nodes.get(connector.getParentTable());</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                if (node != null)</span>
+<span class="fc" id="L158">                    node.setShowImplied(true);</span>
+<span class="fc" id="L159">                node = nodes.get(connector.getChildTable());</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                if (node != null)</span>
+<span class="fc" id="L161">                    node.setShowImplied(true);</span>
+            }
+<span class="fc" id="L163">            dot.println(connector.toString());</span>
+<span class="fc" id="L164">        }</span>
+
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (DotNode node : nodes.values()) {</span>
+<span class="fc" id="L167">            dot.println(node.toString());</span>
+<span class="fc" id="L168">            stats.wroteTable(node.getTable());</span>
+<span class="fc" id="L169">        }</span>
+
+<span class="fc" id="L171">        dot.println(&quot;}&quot;);</span>
+
+<span class="fc" id="L173">        return skippedImpliedConstraints;</span>
+    }
+
+    private static Set&lt;Table&gt; getTableImmediateRelatives(Table table, boolean includeExcluded, boolean includeImplied, Set&lt;ForeignKeyConstraint&gt; skippedImpliedConstraints) {
+<span class="fc" id="L177">        Set&lt;TableColumn&gt; relatedColumns = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (TableColumn column : table.getColumns()) {</span>
+<span class="pc bpc" id="L180" title="2 of 6 branches missed.">            if (column.isAllExcluded() || (!includeExcluded &amp;&amp; column.isExcluded())) {</span>
+<span class="nc" id="L181">                continue;</span>
+            }
+
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (TableColumn childColumn : column.getChildren()) {</span>
+<span class="pc bpc" id="L185" title="2 of 6 branches missed.">                if (childColumn.isAllExcluded() || (!includeExcluded &amp;&amp; childColumn.isExcluded())) {</span>
+<span class="nc" id="L186">                    continue;</span>
+                }
+
+<span class="fc" id="L189">                ForeignKeyConstraint constraint = column.getChildConstraint(childColumn);</span>
+<span class="fc bfc" id="L190" title="All 4 branches covered.">                if (includeImplied || !constraint.isImplied())</span>
+<span class="fc" id="L191">                    relatedColumns.add(childColumn);</span>
+                else
+<span class="fc" id="L193">                    skippedImpliedConstraints.add(constraint);</span>
+<span class="fc" id="L194">            }</span>
+
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            for (TableColumn parentColumn : column.getParents()) {</span>
+<span class="pc bpc" id="L197" title="1 of 6 branches missed.">                if (parentColumn.isAllExcluded() || (!includeExcluded &amp;&amp; parentColumn.isExcluded())) {</span>
+<span class="nc" id="L198">                    continue;</span>
+                }
+
+<span class="fc" id="L201">                ForeignKeyConstraint constraint = column.getParentConstraint(parentColumn);</span>
+<span class="fc bfc" id="L202" title="All 4 branches covered.">                if (includeImplied || !constraint.isImplied())</span>
+<span class="fc" id="L203">                    relatedColumns.add(parentColumn);</span>
+                else
+<span class="fc" id="L205">                    skippedImpliedConstraints.add(constraint);</span>
+<span class="fc" id="L206">            }</span>
+<span class="fc" id="L207">        }</span>
+
+<span class="fc" id="L209">        Set&lt;Table&gt; relatedTables = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (TableColumn column : relatedColumns)</span>
+<span class="fc" id="L211">            relatedTables.add(column.getTable());</span>
+
+<span class="fc" id="L213">        relatedTables.remove(table);</span>
+
+<span class="fc" id="L215">        return relatedTables;</span>
+    }
+
+    private static void markExcludedColumns(Map&lt;Table, DotNode&gt; nodes, Set&lt;TableColumn&gt; excludedColumns) {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (TableColumn column : excludedColumns) {</span>
+<span class="fc" id="L220">            DotNode node = nodes.get(column.getTable());</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            if (node != null) {</span>
+<span class="nc" id="L222">                node.excludeColumn(column);</span>
+            }
+<span class="fc" id="L224">        }</span>
+<span class="fc" id="L225">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

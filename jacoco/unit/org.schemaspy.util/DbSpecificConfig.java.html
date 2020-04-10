@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DbSpecificConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.util</a> &gt; <span class="el_source">DbSpecificConfig.java</span></div><h1>DbSpecificConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004-2010 John Currier
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+
+/**
+ * Configuration of a specific type of database (as specified by -t)
+ *
+ * @author John Currier
+ * @author Wojciech Kasa
+ * @author Thomas Traude
+ * @author Nils Petzaell
+ */
+public class DbSpecificConfig {
+
+<span class="fc" id="L44">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L46">    private static final Pattern OPTION_PATTER = Pattern.compile(&quot;&lt;([a-zA-Z0-9.\\-_]+)&gt;&quot;);</span>
+    private static final String DUMP_FORMAT = &quot;   -%s   \t\t%s&quot;;
+
+    private String dbType;
+    private String description;
+<span class="fc" id="L51">    private final List&lt;DbSpecificOption&gt; options = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L53">    public DbSpecificConfig(String dbType, Properties props) {</span>
+<span class="fc" id="L54">        this.dbType = dbType;</span>
+<span class="fc" id="L55">        description = props.getProperty(&quot;description&quot;);</span>
+<span class="fc" id="L56">        loadOptions(props);</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Resolve the options specified by connectionSpec into {@link DbSpecificOption}s.
+     *
+     * @param properties
+     */
+    private void loadOptions(Properties properties) {
+<span class="fc" id="L65">        Set&lt;String&gt; optionsFound = findOptions(properties.getProperty(&quot;connectionSpec&quot;));</span>
+<span class="fc" id="L66">        optionsFound.stream().forEachOrdered(optionName -&gt; {</span>
+<span class="fc" id="L67">            String desc = properties.getProperty(optionName);</span>
+<span class="fc" id="L68">            options.add(new DbSpecificOption(optionName, desc));</span>
+<span class="fc" id="L69">        });</span>
+<span class="fc" id="L70">    }</span>
+
+    private static Set&lt;String&gt; findOptions(String connectionSpec) {
+<span class="fc" id="L73">        Set&lt;String&gt; optionsFound = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L74">        Matcher matcher = OPTION_PATTER.matcher(connectionSpec);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        while(matcher.find()) {</span>
+<span class="fc" id="L76">            optionsFound.add(matcher.group(1));</span>
+        }
+<span class="fc" id="L78">        return optionsFound;</span>
+    }
+
+    /**
+     * Returns a {@link List} of {@link DbSpecificOption}s that are applicable to the
+     * specified database type.
+     *
+     * @return
+     */
+    public List&lt;DbSpecificOption&gt; getOptions() {
+<span class="fc" id="L88">        return options;</span>
+    }
+
+    /**
+     * Dump usage details associated with the associated type of database
+     */
+    public void dumpUsage() {
+<span class="fc" id="L95">        LOGGER.info(&quot;{} (-t {})&quot;, description, dbType);</span>
+<span class="fc" id="L96">        getOptions().stream().flatMap(option -&gt; {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if (&quot;hostOptionalPort&quot;.equals(option.getName())) {</span>
+<span class="fc" id="L98">                return Stream.of(</span>
+<span class="fc" id="L99">                        String.format(DUMP_FORMAT, &quot;host&quot;, &quot;host of database, may contain port&quot;),</span>
+<span class="fc" id="L100">                        String.format(DUMP_FORMAT, &quot;port&quot;, &quot;optional port if not default&quot;)</span>
+                );
+            } else {
+<span class="fc" id="L103">                return Stream.of(</span>
+<span class="fc" id="L104">                        String.format(DUMP_FORMAT, option.getName(), getDescription(option))</span>
+                );
+            }
+<span class="fc" id="L107">        }).forEach(LOGGER::info);</span>
+<span class="fc" id="L108">    }</span>
+
+    private static String getDescription(DbSpecificOption option) {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        return Objects.isNull(option.getDescription()) ? &quot;&quot; : option.getDescription();</span>
+    }
+
+    /**
+     * Return description of the associated type of database
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L119">        return description;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

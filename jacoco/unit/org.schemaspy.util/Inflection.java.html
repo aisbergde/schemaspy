@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Inflection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.util</a> &gt; <span class="el_source">Inflection.java</span></div><h1>Inflection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2010 John Currier
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.util;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+/**
+ * Implementation of Rails'
+ * &lt;a href='http://api.rubyonrails.org/classes/ActiveSupport/CoreExtensions/String/Inflections.html'&gt;Inflections&lt;/a&gt;
+ * to handle singularization and pluralization of 'Rails strings'.
+ *
+ * Copied from &lt;a href='http://code.google.com/p/rogueweb/'&gt;rogueweb&lt;/a&gt;'s port of Rails to Java.
+ *
+ * @author Anthony Eden
+ */
+public class Inflection {
+<span class="fc" id="L36">    private static final List&lt;Inflection&gt; plural = new ArrayList&lt;Inflection&gt;();</span>
+<span class="fc" id="L37">    private static final List&lt;Inflection&gt; singular = new ArrayList&lt;Inflection&gt;();</span>
+<span class="fc" id="L38">    private static final List&lt;String&gt; uncountable = new ArrayList&lt;String&gt;();</span>
+
+    static {
+        // plural is &quot;singular to plural form&quot;
+        // singular is &quot;plural to singular form&quot;
+<span class="fc" id="L43">        plural(&quot;$&quot;, &quot;s&quot;);</span>
+<span class="fc" id="L44">        plural(&quot;s$&quot;, &quot;s&quot;);</span>
+<span class="fc" id="L45">        plural(&quot;(ax|test)is$&quot;, &quot;$1es&quot;);</span>
+<span class="fc" id="L46">        plural(&quot;(octop|vir)us$&quot;, &quot;$1i&quot;);</span>
+<span class="fc" id="L47">        plural(&quot;(alias|status)$&quot;, &quot;$1es&quot;);</span>
+<span class="fc" id="L48">        plural(&quot;(bu)s$&quot;, &quot;$1ses&quot;);</span>
+<span class="fc" id="L49">        plural(&quot;(buffal|tomat)o$&quot;, &quot;$1oes&quot;);</span>
+<span class="fc" id="L50">        plural(&quot;([ti])um$&quot;, &quot;$1a&quot;);</span>
+<span class="fc" id="L51">        plural(&quot;sis$&quot;, &quot;ses&quot;);</span>
+<span class="fc" id="L52">        plural(&quot;(?:([^f])fe|([lr])f)$&quot;, &quot;$1$2ves&quot;);</span>
+<span class="fc" id="L53">        plural(&quot;(hive)$&quot;, &quot;$1s&quot;);</span>
+<span class="fc" id="L54">        plural(&quot;([^aeiouy]|qu)y$&quot;, &quot;$1ies&quot;);</span>
+        //plural(&quot;([^aeiouy]|qu)ies$&quot;, &quot;$1y&quot;);
+<span class="fc" id="L56">        plural(&quot;(x|ch|ss|sh)$&quot;, &quot;$1es&quot;);</span>
+<span class="fc" id="L57">        plural(&quot;(matr|vert|ind)ix|ex$&quot;, &quot;$1ices&quot;);</span>
+<span class="fc" id="L58">        plural(&quot;([m|l])ouse$&quot;, &quot;$1ice&quot;);</span>
+<span class="fc" id="L59">        plural(&quot;^(ox)$&quot;, &quot;$1en&quot;);</span>
+<span class="fc" id="L60">        plural(&quot;(quiz)$&quot;, &quot;$1zes&quot;);</span>
+
+<span class="fc" id="L62">        singular(&quot;s$&quot;, &quot;&quot;);</span>
+<span class="fc" id="L63">        singular(&quot;(n)ews$&quot;, &quot;$1ews&quot;);</span>
+<span class="fc" id="L64">        singular(&quot;([ti])a$&quot;, &quot;$1um&quot;);</span>
+<span class="fc" id="L65">        singular(&quot;((a)naly|(b)a|(d)iagno|(p)arenthe|(p)rogno|(s)ynop|(t)he)ses$&quot;, &quot;$1$2sis&quot;);</span>
+<span class="fc" id="L66">        singular(&quot;(^analy)ses$&quot;, &quot;$1sis&quot;);</span>
+<span class="fc" id="L67">        singular(&quot;([^f])ves$&quot;, &quot;$1fe&quot;);</span>
+<span class="fc" id="L68">        singular(&quot;(hive)s$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L69">        singular(&quot;(tive)s$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L70">        singular(&quot;([lr])ves$&quot;, &quot;$1f&quot;);</span>
+<span class="fc" id="L71">        singular(&quot;([^aeiouy]|qu)ies$&quot;, &quot;$1y&quot;);</span>
+<span class="fc" id="L72">        singular(&quot;(s)eries$&quot;, &quot;$1eries&quot;);</span>
+<span class="fc" id="L73">        singular(&quot;(m)ovies$&quot;, &quot;$1ovie&quot;);</span>
+<span class="fc" id="L74">        singular(&quot;(x|ch|ss|sh)es$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L75">        singular(&quot;([m|l])ice$&quot;, &quot;$1ouse&quot;);</span>
+<span class="fc" id="L76">        singular(&quot;(bus)es$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L77">        singular(&quot;(o)es$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L78">        singular(&quot;(shoe)s$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L79">        singular(&quot;(cris|ax|test)es$&quot;, &quot;$1is&quot;);</span>
+<span class="fc" id="L80">        singular(&quot;(octop|vir)i$&quot;, &quot;$1us&quot;);</span>
+<span class="fc" id="L81">        singular(&quot;(alias|status)es$&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L82">        singular(&quot;^(ox)en&quot;, &quot;$1&quot;);</span>
+<span class="fc" id="L83">        singular(&quot;(vert|ind)ices$&quot;, &quot;$1ex&quot;);</span>
+<span class="fc" id="L84">        singular(&quot;(matr)ices$&quot;, &quot;$1ix&quot;);</span>
+<span class="fc" id="L85">        singular(&quot;(quiz)zes$&quot;, &quot;$1&quot;);</span>
+
+        // irregular
+<span class="fc" id="L88">        irregular(&quot;person&quot;, &quot;people&quot;);</span>
+<span class="fc" id="L89">        irregular(&quot;man&quot;, &quot;men&quot;);</span>
+<span class="fc" id="L90">        irregular(&quot;child&quot;, &quot;children&quot;);</span>
+<span class="fc" id="L91">        irregular(&quot;sex&quot;, &quot;sexes&quot;);</span>
+<span class="fc" id="L92">        irregular(&quot;move&quot;, &quot;moves&quot;);</span>
+
+<span class="fc" id="L94">        uncountable(&quot;equipment&quot;);</span>
+<span class="fc" id="L95">        uncountable(&quot;information&quot;);</span>
+<span class="fc" id="L96">        uncountable(&quot;rice&quot;);</span>
+<span class="fc" id="L97">        uncountable(&quot;money&quot;);</span>
+<span class="fc" id="L98">        uncountable(&quot;species&quot;);</span>
+<span class="fc" id="L99">        uncountable(&quot;series&quot;);</span>
+<span class="fc" id="L100">        uncountable(&quot;fish&quot;);</span>
+<span class="fc" id="L101">        uncountable(&quot;sheep&quot;);</span>
+
+        //Collections.reverse(singular);
+        //Collections.reverse(plural);
+<span class="fc" id="L105">    }</span>
+
+    private final String pattern;
+    private final String replacement;
+    private final boolean ignoreCase;
+
+    public Inflection(String pattern) {
+<span class="nc" id="L112">        this(pattern, null, true);</span>
+<span class="nc" id="L113">    }</span>
+
+    public Inflection(String pattern, String replacement) {
+<span class="fc" id="L116">        this(pattern, replacement, true);</span>
+<span class="fc" id="L117">    }</span>
+
+<span class="fc" id="L119">    public Inflection(String pattern, String replacement, boolean ignoreCase) {</span>
+<span class="fc" id="L120">        this.pattern = pattern;</span>
+<span class="fc" id="L121">        this.replacement = replacement;</span>
+<span class="fc" id="L122">        this.ignoreCase = ignoreCase;</span>
+<span class="fc" id="L123">    }</span>
+
+    private static void plural(String pattern, String replacement) {
+<span class="fc" id="L126">        plural.add(0, new Inflection(pattern, replacement));</span>
+<span class="fc" id="L127">    }</span>
+
+    private static void singular(String pattern, String replacement) {
+<span class="fc" id="L130">        singular.add(0, new Inflection(pattern, replacement));</span>
+<span class="fc" id="L131">    }</span>
+
+    private static void irregular(String s, String p) {
+<span class="fc" id="L134">        plural(&quot;(&quot; + s.substring(0, 1) + &quot;)&quot; + s.substring(1) + &quot;$&quot;, &quot;$1&quot; + p.substring(1));</span>
+<span class="fc" id="L135">        singular(&quot;(&quot; + p.substring(0, 1) + &quot;)&quot; + p.substring(1) + &quot;$&quot;, &quot;$1&quot; + s.substring(1));</span>
+<span class="fc" id="L136">    }</span>
+
+    private static void uncountable(String word) {
+<span class="fc" id="L139">        uncountable.add(word);</span>
+<span class="fc" id="L140">    }</span>
+
+    /**
+     * Does the given word match?
+     * @param word The word
+     * @return True if it matches the inflection pattern
+     */
+    public boolean match(String word) {
+<span class="fc" id="L148">        int flags = 0;</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (ignoreCase) {</span>
+<span class="fc" id="L150">            flags = flags | Pattern.CASE_INSENSITIVE;</span>
+        }
+<span class="fc" id="L152">        return Pattern.compile(pattern, flags).matcher(word).find();</span>
+    }
+
+    /**
+     * Replace the word with its pattern.
+     * @param word The word
+     * @return The result
+     */
+    public String replace(String word) {
+<span class="fc" id="L161">        int flags = 0;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (ignoreCase) {</span>
+<span class="fc" id="L163">            flags = flags | Pattern.CASE_INSENSITIVE;</span>
+        }
+<span class="fc" id="L165">        return Pattern.compile(pattern, flags).matcher(word).replaceAll(replacement);</span>
+    }
+
+    /**
+     * Return the pluralized version of a word.
+     * @param word The word
+     * @return The pluralized word
+     */
+    public static String pluralize(String word) {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (Inflection.isUncountable(word)) {</span>
+<span class="fc" id="L175">            return word;</span>
+        }
+
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        for (Inflection inflection : plural) {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (inflection.match(word)) {</span>
+<span class="fc" id="L180">                return inflection.replace(word);</span>
+            }
+<span class="fc" id="L182">        }</span>
+<span class="nc" id="L183">        return word;</span>
+    }
+
+    /**
+     * Return the singularized version of a word.
+     * @param word The word
+     * @return The singularized word
+     */
+    public static String singularize(String word) {
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (Inflection.isUncountable(word)) {</span>
+<span class="fc" id="L193">            return word;</span>
+        }
+
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        for (Inflection inflection : singular) {</span>
+            //System.out.println(word + &quot; matches &quot; + inflection.pattern + &quot;? (ignore case: &quot; + inflection.ignoreCase + &quot;)&quot;);
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (inflection.match(word)) {</span>
+                //System.out.println(&quot;match!&quot;);
+<span class="fc" id="L200">                return inflection.replace(word);</span>
+            }
+<span class="fc" id="L202">        }</span>
+<span class="nc" id="L203">        return word;</span>
+    }
+
+    /**
+     * Return true if the word is uncountable.
+     * @param word The word
+     * @return True if it is uncountable
+     */
+    public static boolean isUncountable(String word) {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (String w : uncountable) {</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (w.equalsIgnoreCase(word)) return true;</span>
+<span class="fc" id="L214">        }</span>
+<span class="fc" id="L215">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommandLineArguments.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.cli</a> &gt; <span class="el_source">CommandLineArguments.java</span></div><h1>CommandLineArguments.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.cli;
+
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
+
+import java.io.File;
+
+/**
+ * Holds all supported command line arguments.
+ * &lt;p&gt;
+ * An instance of this class registered as singleton bean in {@link org.schemaspy.SchemaSpyConfiguration} via {@link CommandLineArgumentParser}.
+ * Therefore it can be injected in other beans, for example:
+ * &lt;p&gt;
+ * &lt;pre&gt;
+ *     public class MyService {
+ *         private CommandLineArguments arguments;
+ *
+ *         // use constructor injection
+ *         public MyService(CommandLineArguments arguments) {
+ *             this.arguments = arguments
+ *         }
+ *     }
+ * &lt;/pre&gt;
+ * &lt;p&gt;
+ * TODO migrate other command line parameter from {@link org.schemaspy.Config}
+ *
+ * @author Thomas Traude
+ * @author Nils Petzaell
+ */
+@Parameters(resourceBundle = &quot;commandlinearguments&quot;)
+<span class="fc" id="L50">public class CommandLineArguments {</span>
+
+    @Parameter(names = {
+            &quot;?&quot;, &quot;-?&quot;, &quot;/?&quot;,
+            &quot;-h&quot;,
+            &quot;help&quot;, &quot;-help&quot;, &quot;--help&quot;},
+            descriptionKey = &quot;help&quot;,
+            help = true,
+            order = 1
+    )
+    private boolean helpRequired;
+
+    @Parameter(
+            names = {
+                    &quot;-dbHelp&quot;, &quot;-dbhelp&quot;,
+                    &quot;--dbHelp&quot;, &quot;--dbhelp&quot;
+            },
+            help = true,
+            descriptionKey = &quot;dbhelp&quot;,
+            order = 2
+    )
+    private boolean dbHelpRequired;
+
+    @Parameter(
+            names = {
+                    &quot;-l&quot;,&quot;--license&quot;
+            },
+            help = true,
+            descriptionKey = &quot;license&quot;,
+            order = 3
+    )
+    private boolean printLicense;
+
+<span class="fc" id="L83">    @Parameter(</span>
+            names = {&quot;-debug&quot;, &quot;--debug&quot;, &quot;debug&quot;, &quot;schemaspy.debug&quot;},
+            descriptionKey = &quot;debug&quot;
+    )
+    private boolean debug = false;
+
+<span class="fc" id="L89">    @Parameter(</span>
+            names = {
+                    &quot;-nohtml&quot;, &quot;--no-html&quot;, &quot;nohtml&quot;,
+                    &quot;schemaspy.nohtml&quot;
+            },
+            descriptionKey = &quot;nohtml&quot;
+    )
+    private boolean nohtml = false;
+
+<span class="fc" id="L98">    @Parameter(</span>
+            names = {
+                    &quot;-t&quot;, &quot;--database-type&quot;, &quot;database-type&quot;,
+                    &quot;schemaspy.t&quot;, &quot;schemaspy.database-type&quot;
+            },
+            descriptionKey = &quot;database-type&quot;
+    )
+    private String databaseType = &quot;ora&quot;;
+
+    @Parameter(
+            names = {
+                    &quot;-db&quot;, &quot;-database-name&quot;,
+                    &quot;schemaspy.db&quot;, &quot;schemaspy.database-name&quot;
+            },
+            descriptionKey = &quot;databaseName&quot;
+    )
+    private String databaseName;
+
+<span class="fc" id="L116">    @Parameter(</span>
+            names = {
+                    &quot;-sso&quot;,&quot;--single-sign-on&quot;,
+                    &quot;schemaspy.sso&quot;, &quot;schemaspy.single-sign-on&quot;
+            },
+            descriptionKey = &quot;sso&quot;
+    )
+    private boolean sso = false;
+
+    @Parameter(
+            names = {
+                    &quot;-u&quot;, &quot;--user&quot;, &quot;user&quot;,
+                    &quot;schemaspy.u&quot;, &quot;schemaspy.user&quot;},
+            descriptionKey = &quot;user&quot;
+    )
+    private String user;
+
+    @Parameter(
+            names = {
+                    &quot;-s&quot;, &quot;--schema&quot;, &quot;schema&quot;,
+                    &quot;schemaspy.s&quot;, &quot;schemaspy.schema&quot;
+
+            },
+            descriptionKey = &quot;schema&quot;
+    )
+    private String schema;
+
+    @Parameter(
+            names = {
+                    &quot;-cat&quot;, &quot;--catalog&quot;, &quot;catalog&quot;,
+                    &quot;schemaspy.cat&quot;, &quot;schemaspy.catalog&quot;
+            },
+            descriptionKey = &quot;catalog&quot;
+    )
+    private String catalog;
+
+    /* TODO Password handling is more complex, see Config class (prompt for password, fallback to Environment variable, multiple schemas, etc.)
+    @Parameter(
+            names = {
+                    &quot;-p&quot;, &quot;--password&quot;, &quot;password&quot;,
+                    &quot;schemaspy.p&quot;, &quot;schemaspy.password&quot;
+            },
+            descriptionKey = &quot;password&quot;,
+            password = true
+    )
+    private String password; */
+
+    @Parameter(
+            names = {
+                    &quot;-dp&quot;, &quot;--driverPath&quot;, &quot;driverPath&quot;,
+                    &quot;schemaspy.dp&quot;, &quot;schemaspy.driverPath&quot;
+            },
+            descriptionKey = &quot;driverPath&quot;
+    )
+    private String driverPath;
+
+    @Parameter(
+            names = {
+                    &quot;-o&quot;, &quot;--outputDirectory&quot;, &quot;outputDirectory&quot;,
+                    &quot;schemaspy.o&quot;, &quot;schemaspy.outputDirectory&quot;
+            },
+            descriptionKey = &quot;outputDirectory&quot;
+    )
+    private File outputDirectory;
+
+    @Parameter(
+            names = {
+                    &quot;-port&quot;, &quot;--port&quot;, &quot;port&quot;,
+                    &quot;schemaspy.port&quot;
+            }
+    )
+    private Integer port;
+
+    @Parameter(
+            names = {
+                    &quot;-vizjs&quot;, &quot;schemaspy.vizjs&quot;
+            },
+            descriptionKey = &quot;vizjs&quot;,
+            required = false
+    )
+    private boolean useVizJS;
+
+<span class="fc" id="L198">    @Parameter(</span>
+            names = {
+                    &quot;-degree&quot;, &quot;schemaspy.degree&quot;
+            },
+            descriptionKey = &quot;degree&quot;,
+            required = false,
+            validateValueWith = DegreeOfSeparationValidator.class
+    )
+    private int degreeOfSeparation = 2;
+
+    public boolean isHelpRequired() {
+<span class="fc" id="L209">        return helpRequired;</span>
+    }
+
+    public boolean isDbHelpRequired() {
+<span class="fc" id="L213">        return dbHelpRequired;</span>
+    }
+
+    public boolean isPrintLicense() {
+<span class="fc" id="L217">        return printLicense;</span>
+    }
+
+    public boolean isDebug() {
+<span class="fc" id="L221">        return debug;</span>
+    }
+
+    public boolean isHtmlDisabled() {
+<span class="fc" id="L225">        return nohtml;</span>
+    }
+
+    public boolean isHtmlEnabled() {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        return !nohtml;</span>
+    }
+
+    public String getDatabaseType() {
+<span class="nc" id="L233">        return databaseType;</span>
+    }
+
+    public File getOutputDirectory() {
+<span class="fc" id="L237">        return outputDirectory;</span>
+    }
+
+    public String getSchema() {
+<span class="fc" id="L241">        return schema;</span>
+    }
+
+    public boolean isSingleSignOn() {
+<span class="fc" id="L245">        return sso;</span>
+    }
+
+    public String getUser() {
+<span class="fc" id="L249">        return user;</span>
+    }
+
+    public String getCatalog() {
+<span class="fc" id="L253">        return catalog;</span>
+    }
+
+    public String getDatabaseName() {
+<span class="nc" id="L257">        return databaseName;</span>
+    }
+
+    public Integer getPort() {
+<span class="nc" id="L261">        return port;</span>
+    }
+
+    public boolean useVizJS() {
+<span class="nc" id="L265">        return useVizJS;</span>
+    }
+
+    public int getDegreeOfSeparation() {
+<span class="fc" id="L269">        return degreeOfSeparation;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MustacheCompiler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.view</a> &gt; <span class="el_source">MustacheCompiler.java</span></div><h1>MustacheCompiler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2016, 2017 Rafal Kasa
+ * Copyright (C) 2016 Ismail Simsek
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.view;
+
+import com.github.mustachejava.DefaultMustacheFactory;
+import com.github.mustachejava.Mustache;
+import com.github.mustachejava.MustacheFactory;
+
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.util.HashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+/**
+ * Created by rkasa on 2016-03-22.
+ *
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class MustacheCompiler {
+
+    private final String databaseName;
+    private final HtmlConfig htmlConfig;
+    private final MustacheFactory mustacheFactory;
+
+<span class="fc" id="L52">    public MustacheCompiler(String databaseName, HtmlConfig htmlConfig) {</span>
+<span class="fc" id="L53">        this.databaseName = databaseName;</span>
+<span class="fc" id="L54">        this.htmlConfig = htmlConfig;</span>
+<span class="fc" id="L55">        this.mustacheFactory = new DefaultMustacheFactory(new MustacheCustomResolver(htmlConfig.getTemplateDirectory()));</span>
+<span class="fc" id="L56">    }</span>
+
+    public void write(PageData pageData, Writer writer) throws IOException {
+<span class="fc" id="L59">        StringWriter result = new StringWriter();</span>
+
+<span class="fc" id="L61">        HashMap&lt;String, Object&gt; pageScope = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L62">        pageScope.put(&quot;toFileName&quot;, (Function&lt;String,String&gt;) FileNameGenerator::generate);</span>
+<span class="fc" id="L63">        pageScope.put(&quot;databaseName&quot;, databaseName);</span>
+<span class="fc" id="L64">        pageScope.put(&quot;paginationEnabled&quot;, htmlConfig.isPaginationEnabled());</span>
+<span class="fc" id="L65">        pageScope.put(&quot;displayNumRows&quot;, htmlConfig.isNumRowsEnabled());</span>
+<span class="fc" id="L66">        pageScope.putAll(pageData.getScope());</span>
+
+<span class="fc" id="L68">        Mustache mustachePage = mustacheFactory.compile(pageData.getTemplateName());</span>
+<span class="fc" id="L69">        mustachePage.execute(result, pageScope).flush();</span>
+
+<span class="fc" id="L71">        HashMap&lt;String, Object&gt; containerScope = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L72">        containerScope.put(&quot;content&quot;, result);</span>
+<span class="fc" id="L73">        containerScope.put(&quot;pageScript&quot;, pageData.getScriptName());</span>
+<span class="fc" id="L74">        containerScope.put(&quot;rootPath&quot;, getRootPath(pageData.getDepth()));</span>
+<span class="fc" id="L75">        containerScope.put(&quot;rootPathtoHome&quot;, getRootPathToHome(pageData.getDepth()));</span>
+<span class="fc" id="L76">        containerScope.putAll(pageScope);</span>
+
+<span class="fc" id="L78">        Mustache mustacheContainer = mustacheFactory.compile(&quot;container.html&quot;);</span>
+<span class="fc" id="L79">        mustacheContainer.execute(writer, containerScope).flush();</span>
+<span class="fc" id="L80">    }</span>
+
+
+    public String getRootPath(int depth) {
+<span class="fc" id="L84">        return IntStream.range(0, depth).mapToObj(i -&gt; &quot;../&quot;).collect(Collectors.joining(&quot;&quot;, &quot;&quot;, &quot;&quot;));</span>
+    }
+
+    private String getRootPathToHome(int depth) {
+<span class="fc" id="L88">        String path = getRootPath(depth);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (htmlConfig.isOneOfMultipleSchemas()) {</span>
+<span class="fc" id="L90">            path += &quot;../&quot;;</span>
+        }
+<span class="fc" id="L92">        return path;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DotSummaryFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.dot.schemaspy</a> &gt; <span class="el_source">DotSummaryFormatter.java</span></div><h1>DotSummaryFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.dot.schemaspy;
+
+import org.schemaspy.model.Database;
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.schemaspy.output.dot.DotConfig;
+import org.schemaspy.view.WriteStats;
+
+import java.io.PrintWriter;
+import java.util.*;
+
+/**
+ * Format table data into .dot format to feed to Graphvis' dot program.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Nils Petzaell
+ */
+public class DotSummaryFormatter {
+
+    private final DotFormat dotFormat;
+    private final DotConfig dotConfig;
+
+<span class="fc" id="L44">    public DotSummaryFormatter(DotFormat dotFormat, DotConfig dotConfig) {</span>
+<span class="fc" id="L45">        this.dotFormat = dotFormat;</span>
+<span class="fc" id="L46">        this.dotConfig = dotConfig;</span>
+<span class="fc" id="L47">    }</span>
+
+    public void writeSummaryRealRelationships(Database db, Collection&lt;Table&gt; tables, boolean compact, boolean showColumns, WriteStats stats, PrintWriter dot) {
+<span class="fc" id="L50">        writeRelationships(db, tables, compact, showColumns, false, stats, dot);</span>
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if it wrote any implied relationships
+     */
+    public boolean writeSummaryAllRelationships(Database db, Collection&lt;Table&gt; tables, boolean compact, boolean showColumns, WriteStats stats, PrintWriter dot) {
+<span class="fc" id="L57">        return writeRelationships(db, tables, compact, showColumns, true, stats, dot);</span>
+    }
+
+    private boolean writeRelationships(Database db, Collection&lt;Table&gt; tables, boolean compact, boolean showColumns, boolean includeImplied, WriteStats stats, PrintWriter dot) {
+<span class="fc" id="L61">        DotConnectorFinder finder = DotConnectorFinder.getInstance();</span>
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        DotNodeConfig nodeConfig = showColumns ? new DotNodeConfig(!compact, false) : new DotNodeConfig();</span>
+<span class="fc" id="L63">        boolean wroteImplied = false;</span>
+
+        String diagramName;
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (includeImplied) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (compact)</span>
+<span class="fc" id="L68">                diagramName = &quot;compactImpliedRelationshipsDiagram&quot;;</span>
+            else
+<span class="fc" id="L70">                diagramName = &quot;largeImpliedRelationshipsDiagram&quot;;</span>
+        } else {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (compact)</span>
+<span class="fc" id="L73">                diagramName = &quot;compactRelationshipsDiagram&quot;;</span>
+            else
+<span class="fc" id="L75">                diagramName = &quot;largeRelationshipsDiagram&quot;;</span>
+        }
+<span class="fc" id="L77">        dotFormat.writeHeader(diagramName, true, dot);</span>
+
+<span class="fc" id="L79">        Map&lt;Table, DotNode&gt; nodes = new TreeMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (Table table : tables) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (!table.isOrphan(includeImplied)) {</span>
+<span class="fc" id="L83">                nodes.put(table, new DotNode(table, true, nodeConfig, dotConfig));</span>
+            }
+<span class="fc" id="L85">        }</span>
+
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        for (Table table : db.getRemoteTables()) {</span>
+<span class="nc" id="L88">            nodes.put(table, new DotNode(table, true, nodeConfig, dotConfig));</span>
+<span class="nc" id="L89">        }</span>
+
+<span class="fc" id="L91">        Set&lt;DotConnector&gt; connectors = new TreeSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (DotNode node : nodes.values()) {</span>
+<span class="fc" id="L94">            connectors.addAll(finder.getRelatedConnectors(node.getTable(), includeImplied));</span>
+<span class="fc" id="L95">        }</span>
+
+<span class="fc" id="L97">        markExcludedColumns(nodes, stats.getExcludedColumns());</span>
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (DotNode node : nodes.values()) {</span>
+<span class="fc" id="L100">            Table table = node.getTable();</span>
+
+<span class="fc" id="L102">            dot.println(node.toString());</span>
+<span class="fc" id="L103">            stats.wroteTable(table);</span>
+<span class="fc bfc" id="L104" title="All 6 branches covered.">            wroteImplied = wroteImplied || (includeImplied &amp;&amp; table.isOrphan(false));</span>
+<span class="fc" id="L105">        }</span>
+
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (DotConnector connector : connectors) {</span>
+<span class="fc" id="L108">            dot.println(connector.toString());</span>
+<span class="fc" id="L109">        }</span>
+
+<span class="fc" id="L111">        dot.println(&quot;}&quot;);</span>
+<span class="fc" id="L112">        dot.flush();</span>
+<span class="fc" id="L113">        return wroteImplied;</span>
+    }
+
+    private static void markExcludedColumns(Map&lt;Table, DotNode&gt; nodes, Set&lt;TableColumn&gt; excludedColumns) {
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        for (TableColumn column : excludedColumns) {</span>
+<span class="nc" id="L118">            DotNode node = nodes.get(column.getTable());</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            if (node != null) {</span>
+<span class="nc" id="L120">                node.excludeColumn(column);</span>
+            }
+<span class="nc" id="L122">        }</span>
+<span class="fc" id="L123">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

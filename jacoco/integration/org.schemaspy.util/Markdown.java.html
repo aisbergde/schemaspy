@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Markdown.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.util</a> &gt; <span class="el_source">Markdown.java</span></div><h1>Markdown.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.util;
+
+import com.vladsch.flexmark.ast.Node;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.profiles.pegdown.Extensions;
+import com.vladsch.flexmark.profiles.pegdown.PegdownOptionsAdapter;
+import com.vladsch.flexmark.util.options.DataHolder;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Created by rkasa on 2016-04-11.
+ *
+ * @author Rafal Kasa
+ * @author Daniel Watt
+ */
+public class Markdown {
+
+<span class="fc" id="L43">    private static final DataHolder OPTIONS = PegdownOptionsAdapter.flexmarkOptions(true,</span>
+            Extensions.ALL
+    );
+
+<span class="fc" id="L47">    private static final Parser PARSER = Parser.builder(OPTIONS).build();</span>
+<span class="fc" id="L48">    private static final HtmlRenderer RENDERER = HtmlRenderer.builder(OPTIONS).build();</span>
+<span class="fc" id="L49">    private static final HashMap&lt;String, String&gt; pages = new HashMap&lt;&gt;();</span>
+
+    private Markdown() {}
+
+    public static String toHtml(String markdownText, String rootPath) {
+<span class="fc" id="L54">        String text = markdownText;</span>
+
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (text != null) {</span>
+<span class="fc" id="L57">            text = addReferenceLink(text, rootPath);</span>
+<span class="fc" id="L58">            Node content = PARSER.parse(text);</span>
+<span class="fc" id="L59">            text = RENDERER.render(content).trim();</span>
+        }
+
+<span class="fc" id="L62">        return text;</span>
+    }
+
+    public static void registryPage(String name, String path) {
+<span class="fc" id="L66">        pages.put(name, path);</span>
+<span class="fc" id="L67">    }</span>
+
+    public static String pagePath(String page) {
+<span class="nc" id="L70">        return pages.get(page);</span>
+    }
+
+    private static String addReferenceLink(String markdownText, String rootPath) {
+<span class="fc" id="L74">        StringBuilder text = new StringBuilder(markdownText);</span>
+<span class="fc" id="L75">        String newLine = &quot;\r\n&quot;;</span>
+
+<span class="fc" id="L77">        Pattern p = Pattern.compile(&quot;\\[(.*?)\\]&quot;);</span>
+<span class="fc" id="L78">        Matcher m = p.matcher(markdownText);</span>
+
+<span class="fc" id="L80">        List&lt;String&gt; links = new ArrayList&lt;&gt;();</span>
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        while(m.find()) {</span>
+<span class="nc" id="L83">            links.add(m.group(1));</span>
+        }
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!links.isEmpty()) {</span>
+<span class="nc" id="L87">            text.append(newLine).append(newLine);</span>
+        }
+
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        for (String link : links) {</span>
+<span class="nc" id="L91">            String anchorLink = &quot;&quot;;</span>
+<span class="nc" id="L92">            String pageLink = link;</span>
+<span class="nc" id="L93">            int anchorPosition = link.lastIndexOf('.');</span>
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (anchorPosition &gt; -1) {</span>
+<span class="nc" id="L96">                anchorLink = link.substring(anchorPosition + 1).trim();</span>
+<span class="nc" id="L97">                pageLink = link.substring(0, anchorPosition);</span>
+            }
+
+<span class="nc" id="L100">            String path = rootPath+pagePath(pageLink);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (!&quot;&quot;.equals(anchorLink)) {</span>
+<span class="nc" id="L102">				path = path + &quot;#&quot; + anchorLink;</span>
+			}
+<span class="nc" id="L104">            text.append(&quot;[&quot;).append(link).append(&quot;]: ./&quot;).append(path).append(newLine);</span>
+<span class="nc" id="L105">        }</span>
+
+<span class="fc" id="L107">        return text.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

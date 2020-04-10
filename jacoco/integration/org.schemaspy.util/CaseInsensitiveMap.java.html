@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CaseInsensitiveMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.util</a> &gt; <span class="el_source">CaseInsensitiveMap.java</span></div><h1>CaseInsensitiveMap.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2010 John Currier
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.util;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiFunction;
+
+/**
+ * A {@link HashMap} implementation that uses {@link String}s as its keys
+ * where the keys are treated without regard to case.  That is, &lt;code&gt;get(&quot;MyTableName&quot;)&lt;/code&gt;
+ * will return the same object as &lt;code&gt;get(&quot;MYTABLENAME&quot;)&lt;/code&gt;.
+ *
+ * @author John Currier
+ * @author Daniel Watt
+ */
+public class CaseInsensitiveMap&lt;V&gt; extends HashMap&lt;String, V&gt;
+{
+    private static final long serialVersionUID = 1L;
+
+    public CaseInsensitiveMap()
+<span class="fc" id="L40">    {</span>
+<span class="fc" id="L41">    }</span>
+
+    public CaseInsensitiveMap(int initialCapacity)
+    {
+<span class="nc" id="L45">        super(initialCapacity);</span>
+<span class="nc" id="L46">    }</span>
+
+    @Override
+    public V get(Object key) {
+<span class="fc" id="L50">        V name = null;</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (key != null) {</span>
+<span class="fc" id="L52">            name = super.get(((String)key).toUpperCase());</span>
+        }
+<span class="fc" id="L54">        return name;</span>
+    }
+
+    @Override
+    public V put(String key, V value) {
+<span class="fc" id="L59">        return super.put(key.toUpperCase(), value);</span>
+    }
+
+    @Override
+    public void putAll(Map&lt;? extends String, ? extends V&gt; map) {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (Entry&lt;? extends String, ? extends V&gt; e : map.entrySet()) {</span>
+<span class="fc" id="L65">            put(e.getKey(), e.getValue());</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">    }</span>
+
+    @Override
+    public V merge(String key, V value, BiFunction&lt;? super V, ? super V, ? extends V&gt; remappingFunction) {
+<span class="nc" id="L71">        return super.merge(key.toUpperCase(), value, remappingFunction);</span>
+    }
+
+    @Override
+    public V remove(Object key) {
+<span class="nc" id="L76">        return super.remove(((String)key).toUpperCase());</span>
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+<span class="nc" id="L81">        return super.containsKey(((String)key).toUpperCase());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

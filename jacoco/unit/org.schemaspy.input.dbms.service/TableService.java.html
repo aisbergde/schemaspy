@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">TableService.java</span></div><h1>TableService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016, 2017 Rafal Kasa
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.Config;
+import org.schemaspy.input.dbms.service.helper.ExportForeignKey;
+import org.schemaspy.input.dbms.service.helper.ImportForeignKey;
+import org.schemaspy.input.dbms.service.helper.RemoteTableIdentifier;
+import org.schemaspy.input.dbms.xml.ForeignKeyMeta;
+import org.schemaspy.input.dbms.xml.TableColumnMeta;
+import org.schemaspy.input.dbms.xml.TableMeta;
+import org.schemaspy.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+
+import static java.util.Optional.ofNullable;
+import static org.schemaspy.input.dbms.service.ColumnLabel.*;
+
+/**
+ * Created by rkasa on 2016-12-05.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Wojciech Kasa
+ * @author Thomas Traude
+ * @author Nils Petzaell
+ * @author Daniel Watt
+ */
+public class TableService {
+
+<span class="fc" id="L63">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final SqlService sqlService;
+    private final ColumnService columnService;
+    private final IndexService indexService;
+
+<span class="fc" id="L69">    public TableService(SqlService sqlService, ColumnService columnService, IndexService indexService) {</span>
+<span class="fc" id="L70">        this.sqlService = Objects.requireNonNull(sqlService);</span>
+<span class="fc" id="L71">        this.columnService = Objects.requireNonNull(columnService);</span>
+<span class="fc" id="L72">        this.indexService = Objects.requireNonNull(indexService);</span>
+<span class="fc" id="L73">    }</span>
+
+    public void gatheringTableDetails(Database database, Table table) throws SQLException {
+<span class="nc" id="L76">        columnService.gatherColumns(table);</span>
+<span class="nc" id="L77">        indexService.gatherIndexes(database, table);</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * &quot;Connect&quot; all of this table's foreign keys to their referenced primary keys
+     * (and, in some cases, do the reverse as well).
+     *
+     * @param tables
+     * @throws SQLException
+     */
+    public void connectForeignKeys(Database db, Table table, Map&lt;String, Table&gt; tables) throws SQLException {
+<span class="fc" id="L88">        LOGGER.trace(&quot;Connecting foreign keys to {}&quot;, table.getFullName());</span>
+
+
+<span class="fc" id="L91">        try (ResultSet rs = sqlService.getDatabaseMetaData().getImportedKeys(table.getCatalog(), table.getSchema(), table.getName())) {</span>
+            // get our foreign keys that reference other tables' primary keys
+<span class="fc" id="L93">            ArrayList&lt;ImportForeignKey&gt; importedKeys = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            while (rs.next()) {</span>
+<span class="fc" id="L96">                importedKeys.add(new ImportForeignKey.Builder()</span>
+<span class="fc" id="L97">                        .fromImportKeysResultSet(rs)</span>
+<span class="fc" id="L98">                        .build());</span>
+            }
+
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for(ImportForeignKey importedKey : importedKeys) {</span>
+<span class="fc" id="L102">                addForeignKey(db, table, importedKey, tables);</span>
+<span class="fc" id="L103">            }</span>
+<span class="nc" id="L104">        } catch (SQLException sqlex) {</span>
+<span class="nc" id="L105">            LOGGER.warn(&quot;Failed to getImportedKeys&quot;, sqlex);</span>
+<span class="fc" id="L106">        }</span>
+
+        // also try to find all of the 'remote' tables in other schemas that
+        // point to our primary keys (not necessary in the normal case
+        // as we infer this from the opposite direction)
+<span class="pc bpc" id="L111" title="3 of 6 branches missed.">        if ((table.getSchema() != null || table.getCatalog() != null) &amp;&amp; Config.getInstance().isExportedKeysEnabled() ) {</span>
+<span class="fc" id="L112">            try (ResultSet rs = sqlService.getDatabaseMetaData().getExportedKeys(table.getCatalog(), table.getSchema(), table.getName())) {</span>
+                // get the foreign keys that reference our primary keys
+                // note that this can take an insane amount of time on Oracle (i.e. 30 secs per call)
+
+<span class="fc" id="L116">                ArrayList&lt;ExportForeignKey&gt; exportedKeys = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                while (rs.next()) {</span>
+<span class="fc" id="L119">                    exportedKeys.add(new ExportForeignKey.Builder()</span>
+<span class="fc" id="L120">                            .fromExportedKeysResultSet(rs)</span>
+<span class="fc" id="L121">                            .build());</span>
+                }
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                for(ExportForeignKey exportedKey : exportedKeys) {</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                    if (isRemote(table, exportedKey)) {</span>
+<span class="fc" id="L126">                        addRemoteTable(db, RemoteTableIdentifier.from(exportedKey), table.getSchema());</span>
+                    }
+<span class="fc" id="L128">                }</span>
+<span class="nc" id="L129">            } catch (SQLException sqlex) {</span>
+<span class="nc" id="L130">                LOGGER.warn(&quot;Failed to getExportedKeys&quot;, sqlex);</span>
+<span class="fc" id="L131">            }</span>
+        }
+<span class="fc" id="L133">    }</span>
+
+    private static boolean isRemote(Table table, ExportForeignKey foreignKey) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        return !String.valueOf(table.getCatalog()).equals(String.valueOf(foreignKey.getFkTableCat())) ||</span>
+<span class="pc bnc" id="L137" title="All 2 branches missed.">                !String.valueOf(table.getSchema()).equals(String.valueOf(foreignKey.getFkTableSchema()));</span>
+    }
+
+    /**
+     * Connect to the PK's referenced by this table that live in the original schema
+     * @throws SQLException
+     */
+    private void connectForeignKeysRemoteTable(Database db, RemoteTable remoteTable, Map&lt;String, Table&gt; tables) throws SQLException {
+<span class="fc" id="L145">        LOGGER.trace(&quot;Connecting foreign keys to {}&quot;, remoteTable.getFullName());</span>
+
+<span class="fc" id="L147">        try (ResultSet rs = sqlService.getDatabaseMetaData().getImportedKeys(remoteTable.getCatalog(), remoteTable.getSchema(), remoteTable.getName())){</span>
+            // get remote table's FKs that reference PKs in our schema
+
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            while (rs.next()) {</span>
+<span class="fc" id="L151">                ImportForeignKey foreignKey = new ImportForeignKey.Builder().fromImportKeysResultSet(rs).build();</span>
+
+                // if it points back to our schema then use it
+<span class="pc bpc" id="L154" title="3 of 4 branches missed.">                if (remoteTable.getBaseContainer().equals(foreignKey.getPkTableSchema()) || remoteTable.getBaseContainer().equals(foreignKey.getPkTableCat())) {</span>
+<span class="fc" id="L155">                    addForeignKey(db, remoteTable, foreignKey, tables);</span>
+                }
+<span class="fc" id="L157">            }</span>
+<span class="nc" id="L158">        } catch (SQLException sqlExc) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (!remoteTable.isLogical()) {</span>
+                // if explicitly asking for these details then propagate the exception
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (Config.getInstance().isOneOfMultipleSchemas())</span>
+<span class="nc" id="L162">                    throw sqlExc;</span>
+
+                // otherwise just report the fact that we tried &amp; couldn't
+<span class="nc" id="L165">                LOGGER.warn(&quot;Couldn't resolve foreign keys for remote table '{}'&quot;, remoteTable.getFullName(), sqlExc);</span>
+            }
+<span class="fc" id="L167">        }</span>
+<span class="fc" id="L168">    }</span>
+
+    protected void addForeignKey(Database db, Table table, ImportForeignKey foreignKey,
+                                 Map&lt;String, Table&gt; tables) throws SQLException {
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        if (Objects.isNull(foreignKey.getFkName()) || shouldExclude(db.getName(), foreignKey)) {</span>
+<span class="fc" id="L173">            return;</span>
+        }
+
+<span class="fc" id="L176">        ForeignKeyConstraint foreignKeyConstraint = ofNullable(table.getForeignKeysMap().get(foreignKey.getFkName()))</span>
+<span class="fc" id="L177">                .orElseGet(() -&gt; {</span>
+<span class="fc" id="L178">                    ForeignKeyConstraint fkc = new ForeignKeyConstraint(</span>
+                            table,
+<span class="fc" id="L180">                            foreignKey.getFkName(),</span>
+<span class="fc" id="L181">                            foreignKey.getUpdateRule(),</span>
+<span class="fc" id="L182">                            foreignKey.getDeleteRule()</span>
+                    );
+<span class="fc" id="L184">                    table.getForeignKeysMap().put(foreignKey.getFkName(), fkc);</span>
+<span class="fc" id="L185">                    return fkc;</span>
+                });
+
+<span class="fc" id="L188">        TableColumn childColumn = table.getColumn(foreignKey.getFkColumnName());</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (childColumn != null) {</span>
+<span class="fc" id="L190">            foreignKeyConstraint.addChildColumn(childColumn);</span>
+
+<span class="fc" id="L192">            Table parentTable = tables.get(foreignKey.getPkTableName());</span>
+
+<span class="fc" id="L194">            String parentContainer = Stream.of(foreignKey.getPkTableSchema(), foreignKey.getPkTableCat(), db.getName())</span>
+<span class="fc" id="L195">                    .filter(Objects::nonNull)</span>
+<span class="fc" id="L196">                    .findFirst()</span>
+<span class="fc" id="L197">                    .orElse(null);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            String childContainer = table instanceof RemoteTable ? ((RemoteTable) table).getBaseContainer() : table.getContainer();</span>
+
+            // if named table doesn't exist in this schema
+            // or exists here but really referencing same named table in another schema
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">            if (parentTable == null || !childContainer.equals(parentContainer)) {</span>
+<span class="fc" id="L203">                LOGGER.debug(&quot;Adding remote table {}&quot;, Table.getFullName(</span>
+<span class="fc" id="L204">                        db.getName(),</span>
+<span class="fc" id="L205">                        foreignKey.getPkTableCat(),</span>
+<span class="fc" id="L206">                        foreignKey.getPkTableSchema(),</span>
+<span class="fc" id="L207">                        foreignKey.getPkTableName()</span>
+                ));
+<span class="fc" id="L209">                parentTable = addRemoteTable(db, RemoteTableIdentifier.from(foreignKey), table.getContainer());</span>
+            }
+
+<span class="fc" id="L212">            TableColumn parentColumn = parentTable.getColumn(foreignKey.getPkColumnName());</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (parentColumn != null) {</span>
+<span class="fc" id="L214">                foreignKeyConstraint.addParentColumn(parentColumn);</span>
+
+<span class="fc" id="L216">                childColumn.addParent(parentColumn, foreignKeyConstraint);</span>
+<span class="fc" id="L217">                parentColumn.addChild(childColumn, foreignKeyConstraint);</span>
+            } else {
+<span class="fc" id="L219">                LOGGER.warn(&quot;Couldn't add FK '{}' to table '{}' - Column '{}' doesn't exist in table '{}'&quot;, foreignKeyConstraint.getName(), table.getName(), foreignKey.getPkColumnName(), parentTable);</span>
+            }
+<span class="fc" id="L221">        } else {</span>
+<span class="fc" id="L222">            LOGGER.warn(&quot;Couldn't add FK '{}' to table '{}' - Column '{}' doesn't exist&quot;, foreignKeyConstraint.getName(), table.getName(), foreignKey.getFkColumnName());</span>
+        }
+<span class="fc" id="L224">    }</span>
+
+    private boolean shouldExclude(String databaseName, ImportForeignKey foreignKey) {
+<span class="fc" id="L227">        Pattern include = Config.getInstance().getTableInclusions();</span>
+<span class="fc" id="L228">        Pattern exclude = Config.getInstance().getTableExclusions();</span>
+
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">        if (!include.matcher(foreignKey.getPkTableName()).matches() || exclude.matcher(foreignKey.getPkTableName()).matches()) {</span>
+<span class="fc" id="L231">            LOGGER.debug(&quot;Ignoring {} referenced by FK {}&quot;, Table.getFullName(</span>
+                    databaseName,
+<span class="fc" id="L233">                    foreignKey.getPkTableCat(),</span>
+<span class="fc" id="L234">                    foreignKey.getPkTableSchema(),</span>
+<span class="fc" id="L235">                    foreignKey.getPkTableName()</span>
+<span class="fc" id="L236">            ), foreignKey.getFkName());</span>
+<span class="fc" id="L237">            return true;</span>
+        }
+<span class="fc" id="L239">        return false;</span>
+    }
+
+
+    /**
+     * Fetch the number of rows contained in this table.
+     *
+     * returns -1 if unable to successfully fetch the row count
+     *
+     * @param db Database
+     * @return int
+     * @throws SQLException
+     */
+    protected long fetchNumRows(Database db, Table table) {
+<span class="nc bnc" id="L253" title="All 4 branches missed.">        if (table.isView() || table.isRemote())</span>
+<span class="nc" id="L254">            return -1;</span>
+
+<span class="nc" id="L256">        SQLException originalFailure = null;</span>
+
+<span class="nc" id="L258">        String sql = Config.getInstance().getDbProperties().getProperty(&quot;selectRowCountSql&quot;);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (sql != null) {</span>
+            try {
+<span class="nc" id="L261">                return fetchNumRows(db, table, sql);</span>
+<span class="nc" id="L262">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L264">                originalFailure = sqlException;</span>
+<span class="nc" id="L265">                LOGGER.debug(&quot;Failed to fetch number of rows for '{}' using custom query: '{}'&quot;, table.getFullName(), sql, sqlException);</span>
+            }
+        }
+
+        // if we get here then we either didn't have custom SQL or it didn't work
+        try {
+            // '*' should work best for the majority of cases
+<span class="nc" id="L272">            return fetchNumRows(db, table, &quot;count(*)&quot;, false);</span>
+<span class="nc" id="L273">        } catch (SQLException try2Exception) {</span>
+<span class="nc" id="L274">            LOGGER.debug(&quot;Failed to fetch number of rows for '{}' using built-in query with 'count(*)'&quot;, table.getFullName(), try2Exception);</span>
+            try {
+                // except nested tables...try using '1' instead
+<span class="nc" id="L277">                return fetchNumRows(db, table, &quot;count(1)&quot;, false);</span>
+<span class="nc" id="L278">            } catch (SQLException try3Exception) {</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                if (!table.isLogical()) {</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                    if (originalFailure != null)</span>
+<span class="nc" id="L281">                        LOGGER.warn(&quot;Failed to fetch number of rows for '{}' using custom query: '{}'&quot;, table.getFullName(), sql, originalFailure);</span>
+<span class="nc" id="L282">                    LOGGER.warn(&quot;Failed to fetch number of rows for '{}' using built-in query with 'count(*)'&quot;, table.getFullName(), try2Exception);</span>
+<span class="nc" id="L283">                    LOGGER.warn(&quot;Failed to fetch number of rows for '{}' using built-in query with 'count(1)'&quot;, table.getFullName(), try3Exception);</span>
+                }
+<span class="nc" id="L285">                return -1;</span>
+            }
+        }
+    }
+
+    private long fetchNumRows(Database database, Table table, String sql) throws SQLException {
+<span class="nc" id="L291">        try (PreparedStatement stmt = sqlService.prepareStatement(sql, database, table.getName());</span>
+<span class="nc" id="L292">             ResultSet rs = stmt.executeQuery()) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            if (rs.next()) {</span>
+<span class="nc" id="L294">                return rs.getLong(&quot;row_count&quot;);</span>
+            } else {
+<span class="nc" id="L296">                throw new SQLException(&quot;Empty ResultSet&quot;);</span>
+            }
+        }
+    }
+
+    protected long fetchNumRows(Database db, Table table, String clause, boolean forceQuotes) throws SQLException {
+<span class="nc" id="L302">        StringBuilder sql = new StringBuilder(&quot;select &quot;);</span>
+<span class="nc" id="L303">        sql.append(clause);</span>
+<span class="nc" id="L304">        sql.append(&quot; from &quot;);</span>
+<span class="nc" id="L305">        sql.append(sqlService.getQualifiedTableName(</span>
+<span class="nc" id="L306">                table.getCatalog(),</span>
+<span class="nc" id="L307">                table.getSchema(),</span>
+<span class="nc" id="L308">                table.getName(),</span>
+                forceQuotes)
+        );
+
+<span class="nc" id="L312">        LOGGER.trace(&quot;Fetch number of rows using sql: '{}'&quot;,sql);</span>
+<span class="nc" id="L313">        try (PreparedStatement stmt = sqlService.prepareStatement(sql.toString());</span>
+<span class="nc" id="L314">             ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            if (rs.next()) {</span>
+<span class="nc" id="L317">                return rs.getLong(1);</span>
+            }
+<span class="nc" id="L319">            return -1;</span>
+<span class="nc" id="L320">        } catch (SQLException exc) {</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            if (forceQuotes) // we tried with and w/o quotes...fail this attempt</span>
+<span class="nc" id="L322">                throw exc;</span>
+
+<span class="nc" id="L324">            return fetchNumRows(db, table, clause, true);</span>
+        }
+    }
+
+    public Table addRemoteTable(Database db, RemoteTableIdentifier remoteTableIdentifier, String schema) throws SQLException {
+<span class="fc" id="L329">        return addRemoteTable(db, remoteTableIdentifier, schema, false);</span>
+    }
+
+    public Table addLogicalRemoteTable(Database db, RemoteTableIdentifier remoteTableIdentifier, String schema) throws SQLException {
+<span class="fc" id="L333">        return addRemoteTable(db, remoteTableIdentifier, schema, true);</span>
+    }
+
+    private Table addRemoteTable(Database db, RemoteTableIdentifier remoteTableIdentifier, String baseContainer, boolean logical) throws SQLException {
+<span class="fc" id="L337">        String fullName = db.getRemoteTableKey(</span>
+<span class="fc" id="L338">                remoteTableIdentifier.getCatalogName(),</span>
+<span class="fc" id="L339">                remoteTableIdentifier.getSchemaName(),</span>
+<span class="fc" id="L340">                remoteTableIdentifier.getTableName()</span>
+        );
+<span class="fc" id="L342">        RemoteTable remoteTable = (RemoteTable)db.getRemoteTablesMap().get(fullName);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (remoteTable == null) {</span>
+<span class="fc" id="L344">            LOGGER.debug(&quot;Creating remote table {}&quot;, fullName);</span>
+
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (logical)</span>
+<span class="fc" id="L347">                remoteTable = new LogicalRemoteTable(db, remoteTableIdentifier, baseContainer);</span>
+            else {
+<span class="fc" id="L349">                remoteTable = new RemoteTable(db, remoteTableIdentifier, baseContainer);</span>
+<span class="fc" id="L350">                columnService.gatherColumns(remoteTable);</span>
+            }
+
+<span class="fc" id="L353">            LOGGER.debug(&quot;Adding remote table {}&quot;, fullName);</span>
+
+<span class="fc" id="L355">            db.getRemoteTablesMap().put(fullName, remoteTable);</span>
+<span class="fc" id="L356">            connectForeignKeysRemoteTable(db, remoteTable, db.getLocals());</span>
+        }
+
+<span class="fc" id="L359">        return remoteTable;</span>
+    }
+
+    /**
+     * Same as {@link #connectForeignKeys(Database, Table, Map)},
+     * but uses XML-based metadata
+     *
+     * @param tableMeta
+     * @param tables
+     */
+    public void connect(Database db, Table table, TableMeta tableMeta, Map&lt;String, Table&gt; tables) {
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        for (TableColumnMeta colMeta : tableMeta.getColumns()) {</span>
+<span class="fc" id="L371">            TableColumn col = table.getColumn(colMeta.getName());</span>
+
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (col != null) {</span>
+                // go thru the new foreign key defs and associate them with our columns
+<span class="fc bfc" id="L375" title="All 2 branches covered.">                for (ForeignKeyMeta fk : colMeta.getForeignKeys()) {</span>
+                    Table parent;
+
+<span class="pc bpc" id="L378" title="3 of 4 branches missed.">                    if (fk.getRemoteCatalog() != null || fk.getRemoteSchema() != null) {</span>
+                        try {
+                            // adds if doesn't exist
+<span class="fc" id="L381">                            parent = addLogicalRemoteTable(db, RemoteTableIdentifier.from(fk), table.getContainer());</span>
+<span class="fc" id="L382">                            addColumnIfMissing(parent, fk.getColumnName());</span>
+<span class="nc" id="L383">                        } catch (SQLException exc) {</span>
+<span class="nc" id="L384">                            parent = null;</span>
+<span class="nc" id="L385">                            LOGGER.debug(&quot;Failed to addRemoteTable '{}.{}.{}'&quot;, fk.getRemoteCatalog(), fk.getRemoteSchema(), fk.getTableName(), exc);</span>
+<span class="pc" id="L386">                        }</span>
+                    } else {
+<span class="nc" id="L388">                        parent = tables.get(fk.getTableName());</span>
+                    }
+
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                    if (parent != null) {</span>
+<span class="fc" id="L392">                        TableColumn parentColumn = parent.getColumn(fk.getColumnName());</span>
+
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">                        if (parentColumn == null) {</span>
+<span class="nc" id="L395">                            LOGGER.warn(&quot;Undefined column '{}.{}' referenced by '{}.{}' in XML metadata&quot;, parent.getName(), fk.getColumnName(), col.getTable(), col);</span>
+                        } else {
+                            /**
+                             * Merely instantiating a foreign key constraint ties it
+                             * into its parent and child columns (&amp; therefore their tables)
+                             */
+                            /* TODO: This sort of code suggest that too much is happening in the constructor.
+                             * Should either be a factory or constructed by a method of the holding object.
+                             * Or operations preformed in the constructor should be exposed.
+                             */
+                            @SuppressWarnings(&quot;unused&quot;)
+<span class="fc" id="L406">                            ForeignKeyConstraint unused = new ForeignKeyConstraint(parentColumn, col) {</span>
+                                @Override
+                                public String getName() {
+<span class="fc" id="L409">                                    return &quot;Defined in XML&quot;;</span>
+                                }
+                            };
+
+                            // they forgot to say it was a primary key
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                            if (!parentColumn.isPrimary()) {</span>
+<span class="fc" id="L415">                                LOGGER.warn(&quot;Assuming '{}.{}' is a primary key due to being referenced by '{}.{}'&quot;, parentColumn.getTable(), parentColumn, col.getTable(), col);</span>
+<span class="fc" id="L416">                                parent.setPrimaryColumn(parentColumn);</span>
+                            }
+                        }
+<span class="fc" id="L419">                    } else {</span>
+<span class="nc" id="L420">                        LOGGER.warn(&quot;Undefined table '{}' referenced by '{}.{}' in XML metadata&quot;, fk.getTableName(), table.getName(), col.getName());</span>
+                    }
+<span class="fc" id="L422">                }</span>
+            } else {
+<span class="nc" id="L424">                LOGGER.warn(&quot;Undefined column '{}.{}' in XML metadata&quot;, table.getName(), colMeta.getName());</span>
+            }
+<span class="fc" id="L426">        }</span>
+<span class="fc" id="L427">    }</span>
+
+    private void addColumnIfMissing(Table parent, String columnName) {
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        if (!parent.getColumnsMap().containsKey(columnName)) {</span>
+<span class="fc" id="L431">            TableColumn tableColumn = new TableColumn(parent);</span>
+<span class="fc" id="L432">            tableColumn.setName(columnName);</span>
+<span class="fc" id="L433">            parent.getColumnsMap().put(columnName, tableColumn);</span>
+        }
+<span class="fc" id="L435">    }</span>
+
+    public void gatherTableIds(Config config, Database db) throws SQLException {
+<span class="nc" id="L438">        String sql = config.getDbProperties().getProperty(&quot;selectTableIdsSql&quot;);</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (sql != null) {</span>
+
+<span class="nc" id="L441">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="nc" id="L442">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="nc bnc" id="L444" title="All 2 branches missed.">                while (rs.next()) {</span>
+<span class="nc" id="L445">                    String tableName = rs.getString(TABLE_NAME);</span>
+<span class="nc" id="L446">                    Table table = db.getLocals().get(tableName);</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">                    if (table != null)</span>
+<span class="nc" id="L448">                        table.setId(rs.getObject(&quot;table_id&quot;));</span>
+<span class="nc" id="L449">                }</span>
+<span class="nc" id="L450">            } catch (SQLException sqlException) {</span>
+<span class="nc" id="L451">                LOGGER.warn(&quot;Failed to fetch table ids using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="nc" id="L452">            }</span>
+        }
+<span class="nc" id="L454">    }</span>
+
+    /**
+     * Initializes table comments.
+     * If the SQL also returns view comments then they're plugged into the
+     * appropriate views.
+     *
+     * @throws SQLException
+     */
+    public void gatherTableComments(Config config, Database db) {
+<span class="nc" id="L464">        String sql = config.getDbProperties().getProperty(&quot;selectTableCommentsSql&quot;);</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">        if (sql != null) {</span>
+
+<span class="nc" id="L467">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="nc" id="L468">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                while (rs.next()) {</span>
+<span class="nc" id="L471">                    String tableName = rs.getString(TABLE_NAME);</span>
+<span class="nc" id="L472">                    Table table = db.getLocals().get(tableName);</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                    if (table != null)</span>
+<span class="nc" id="L474">                        table.setComments(rs.getString(&quot;comments&quot;));</span>
+<span class="nc" id="L475">                }</span>
+<span class="nc" id="L476">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L478">                LOGGER.warn(&quot;Failed to retrieve table comments using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="nc" id="L479">            }</span>
+        }
+<span class="nc" id="L481">    }</span>
+
+    /**
+     * Initializes table column comments.
+     * If the SQL also returns view column comments then they're plugged into the
+     * appropriate views.
+     *
+     * @throws SQLException
+     */
+    public void gatherTableColumnComments(Config config, Database db) {
+<span class="nc" id="L491">        String sql = config.getDbProperties().getProperty(&quot;selectColumnCommentsSql&quot;);</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (sql != null) {</span>
+
+<span class="nc" id="L494">            try (PreparedStatement stmt = sqlService.prepareStatement(sql, db, null);</span>
+<span class="nc" id="L495">                 ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="nc bnc" id="L497" title="All 2 branches missed.">                while (rs.next()) {</span>
+<span class="nc" id="L498">                    String tableName = rs.getString(TABLE_NAME);</span>
+<span class="nc" id="L499">                    Table table = db.getLocals().get(tableName);</span>
+<span class="nc bnc" id="L500" title="All 2 branches missed.">                    if (table != null) {</span>
+<span class="nc" id="L501">                        TableColumn column = table.getColumn(rs.getString(COLUMN_NAME));</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                        if (column != null)</span>
+<span class="nc" id="L503">                            column.setComments(rs.getString(COMMENTS));</span>
+                    }
+<span class="nc" id="L505">                }</span>
+<span class="nc" id="L506">            } catch (SQLException sqlException) {</span>
+                // don't die just because this failed
+<span class="nc" id="L508">                LOGGER.warn(&quot;Failed to retrieve column comments using SQL '{}'&quot;, sql, sqlException);</span>
+<span class="nc" id="L509">            }</span>
+        }
+<span class="nc" id="L511">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

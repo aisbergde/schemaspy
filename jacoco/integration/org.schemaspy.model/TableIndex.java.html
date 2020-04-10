@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">TableIndex.java</span></div><h1>TableIndex.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2010, 2014 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import java.util.*;
+
+/**
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Wojciech Kasa
+ * @author Daniel Watt
+ */
+public class TableIndex implements Comparable&lt;TableIndex&gt; {
+    private final String name;
+    private final boolean isUnique;
+    private Object id;
+    private boolean isPrimary;
+<span class="fc" id="L38">    private final List&lt;TableColumn&gt; columns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L39">    private final List&lt;Boolean&gt; columnsAscending = new ArrayList&lt;&gt;(); // for whether colums are ascending order</span>
+
+<span class="fc" id="L41">    public TableIndex(String name, boolean unique) {</span>
+<span class="fc" id="L42">        this.name = name;</span>
+<span class="fc" id="L43">        this.isUnique = unique;</span>
+<span class="fc" id="L44">    }</span>
+
+    public void setId(Object id) {
+<span class="nc" id="L47">        this.id = id;</span>
+<span class="nc" id="L48">    }</span>
+
+    public Object getId() {
+<span class="fc" id="L51">        return id;</span>
+    }
+
+    public String getName() {
+<span class="fc" id="L55">        return name;</span>
+    }
+
+    public void addColumn(TableColumn column, String sortOrder) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (column != null) {</span>
+<span class="fc" id="L60">            columns.add(column);</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            columnsAscending.add(sortOrder == null || &quot;A&quot;.equals(sortOrder));</span>
+        }
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * @return
+     */
+    public String getType() {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (isPrimaryKey())</span>
+<span class="fc" id="L70">            return &quot;Primary key&quot;;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (isUnique())</span>
+<span class="fc" id="L72">            return &quot;Must be unique&quot;;</span>
+<span class="fc" id="L73">        return &quot;Performance&quot;;</span>
+    }
+
+    /**
+     * @return
+     */
+    public boolean isPrimaryKey() {
+<span class="fc" id="L80">        return isPrimary;</span>
+    }
+
+    /**
+     * @param isPrimaryKey
+     */
+    public void setIsPrimaryKey(boolean isPrimaryKey) {
+<span class="fc" id="L87">        isPrimary = isPrimaryKey;</span>
+<span class="fc" id="L88">    }</span>
+
+    /**
+     * @return
+     */
+    public boolean isUnique() {
+<span class="fc" id="L94">        return isUnique;</span>
+    }
+
+    /**
+     * @return
+     */
+    public String getColumnsAsString() {
+<span class="fc" id="L101">        StringBuilder buf = new StringBuilder();</span>
+
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (TableColumn column : columns) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (buf.length() &gt; 0)</span>
+<span class="fc" id="L105">                buf.append(&quot; + &quot;);</span>
+<span class="fc" id="L106">            buf.append(column);</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        return buf.toString();</span>
+    }
+
+    public String getSortAsString() {
+<span class="fc" id="L112">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L113">        Iterator&lt;TableColumn&gt; columnsIter = columns.iterator();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        while (columnsIter.hasNext()) {</span>
+<span class="fc" id="L115">            TableColumn column = columnsIter.next();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (this.isAscending(column))</span>
+<span class="fc" id="L117">                buf.append(&quot;&lt;span title='Ascending'&gt;Asc&lt;/span&gt;&quot;);</span>
+            else
+<span class="nc" id="L119">                buf.append(&quot;&lt;span title='Descending'&gt;Desc&lt;/span&gt;&quot;);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (columnsIter.hasNext())</span>
+<span class="fc" id="L121">                buf.append(&quot;/&quot;);</span>
+<span class="fc" id="L122">        }</span>
+
+<span class="fc" id="L124">        return buf.toString();</span>
+    }
+
+    public List&lt;TableColumn&gt; getColumns() {
+<span class="fc" id="L128">        return Collections.unmodifiableList(columns);</span>
+    }
+
+    /**
+     * @param column
+     * @return
+     */
+    public boolean isAscending(TableColumn column) {
+<span class="fc" id="L136">        return columnsAscending.get(columns.indexOf(column));</span>
+    }
+
+    /**
+     * @param other
+     * @return
+     */
+    @Override
+	public int compareTo(TableIndex other) {
+<span class="fc bfc" id="L145" title="All 4 branches covered.">        if (isPrimaryKey() &amp;&amp; !other.isPrimaryKey())</span>
+<span class="fc" id="L146">            return -1;</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (!isPrimaryKey() &amp;&amp; other.isPrimaryKey())</span>
+<span class="fc" id="L148">            return 1;</span>
+
+<span class="fc" id="L150">        Object thisId = getId();</span>
+<span class="fc" id="L151">        Object otherId = other.getId();</span>
+<span class="pc bpc" id="L152" title="3 of 4 branches missed.">        if (thisId == null || otherId == null)</span>
+<span class="fc" id="L153">            return getName().compareToIgnoreCase(other.getName());</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (thisId instanceof Number)</span>
+<span class="nc" id="L155">            return ((Number)thisId).intValue() - ((Number)otherId).intValue();</span>
+<span class="nc" id="L156">        return thisId.toString().compareToIgnoreCase(otherId.toString());</span>
+    }
+
+    @Override public boolean equals(Object other) {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (this == other) return true;</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        if (other == null || getClass() != other.getClass()) return false;</span>
+<span class="nc" id="L162">        Object thisId = getId();</span>
+<span class="nc" id="L163">        Object otherId = ((TableIndex)other).getId();</span>
+<span class="nc bnc" id="L164" title="All 4 branches missed.">        if (thisId == null || otherId == null)</span>
+<span class="nc" id="L165">            return getName().equalsIgnoreCase(((TableIndex)other).getName());</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (thisId instanceof Number)</span>
+<span class="nc" id="L167">            return thisId.equals(otherId);</span>
+<span class="nc" id="L168">        return thisId.toString().equalsIgnoreCase(otherId.toString());</span>
+    }
+    @Override public int hashCode() {
+<span class="fc" id="L171">        Object thisId = getId();</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (thisId == null) {</span>
+<span class="fc" id="L173">        	return Objects.hash(name);</span>
+		}
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (thisId instanceof Number) {</span>
+<span class="nc" id="L176">            return (Objects.hash(thisId));</span>
+        }
+<span class="nc" id="L178">        return Objects.hash(thisId.toString().toLowerCase());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

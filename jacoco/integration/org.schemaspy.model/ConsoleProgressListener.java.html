@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsoleProgressListener.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">ConsoleProgressListener.java</span></div><h1>ConsoleProgressListener.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011, 2014 John Currier
+ * Copyright (C) 2017 Thomas Traude
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import org.schemaspy.Config;
+import org.schemaspy.cli.CommandLineArguments;
+
+import java.io.File;
+import java.util.Collection;
+
+/**
+ * Implementation of {@link ProgressListener} that sends its output to the console.
+ *
+ * @author John Currier
+ * @author Thomas Traude
+ */
+public class ConsoleProgressListener implements ProgressListener {
+	private final CommandLineArguments commandLineArguments;
+
+	private final boolean render;
+	private long startedAt;
+	private long startedGatheringAt;
+	private long startedConnectingAt;
+	private long startedGraphingSummariesAt;
+	private long startedGraphingDetailsAt;
+	private long finishedAt;
+
+<span class="fc" id="L46">    public ConsoleProgressListener(boolean render, CommandLineArguments commandLineArguments) {</span>
+<span class="fc" id="L47">    	this.render = render;</span>
+<span class="fc" id="L48">		this.commandLineArguments = commandLineArguments;</span>
+<span class="fc" id="L49">		startedAt = System.currentTimeMillis();</span>
+<span class="fc" id="L50">	}</span>
+
+	@Override
+	public long startedGatheringDetails() {
+<span class="fc" id="L54">        startedGatheringAt = System.currentTimeMillis();</span>
+<span class="fc" id="L55">        long duration = startedAt - startedGatheringAt;</span>
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (render) {</span>
+<span class="fc" id="L58">			System.out.print(&quot;Gathering schema details...&quot;);</span>
+		}
+
+<span class="fc" id="L61">        return duration;</span>
+	}
+
+	@Override
+	public void gatheringDetailsProgressed(Table table) {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">		if (render) {</span>
+<span class="fc" id="L67">			System.out.print('.');</span>
+		}
+<span class="fc" id="L69">	}</span>
+
+	@Override
+	public long startedConnectingTables() {
+<span class="fc" id="L73">        startedConnectingAt = System.currentTimeMillis();</span>
+<span class="fc" id="L74">        long duration = startedConnectingAt - startedGatheringAt;</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (render) {</span>
+<span class="fc" id="L77">	        System.err.flush();</span>
+<span class="fc" id="L78">	        System.out.flush();</span>
+<span class="fc" id="L79">	        System.out.println(&quot;(&quot; + duration / 1000 + &quot;sec)&quot;);</span>
+<span class="fc" id="L80">	        System.out.print(&quot;Connecting relationships...&quot;);</span>
+        }
+
+<span class="fc" id="L83">        return duration;</span>
+	}
+
+	@Override
+	public void connectingTablesProgressed(Table table) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">		if (render) {</span>
+<span class="fc" id="L89">			System.out.print('.');</span>
+		}
+<span class="fc" id="L91">	}</span>
+
+	@Override
+	public long startedGraphingSummaries() {
+<span class="fc" id="L95">        startedGraphingSummariesAt = System.currentTimeMillis();</span>
+<span class="fc" id="L96">        long duration = startedGraphingSummariesAt - startedConnectingAt;</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (render) {</span>
+<span class="fc" id="L99">	        System.err.flush();</span>
+<span class="fc" id="L100">	        System.out.flush();</span>
+<span class="fc" id="L101">	        System.out.println(&quot;(&quot; + duration / 1000 + &quot;sec)&quot;);</span>
+<span class="fc" id="L102">	        System.out.print(&quot;Writing/graphing summary&quot;);</span>
+<span class="fc" id="L103">			System.out.print('.');</span>
+        }
+
+<span class="fc" id="L106">        return duration;</span>
+	}
+
+	@Override
+	public void graphingSummaryProgressed() {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">		if (render) {</span>
+<span class="fc" id="L112">			System.out.print('.');</span>
+		}
+<span class="fc" id="L114">	}</span>
+
+	@Override
+	public long startedGraphingDetails() {
+<span class="fc" id="L118">		startedGraphingDetailsAt = System.currentTimeMillis();</span>
+<span class="fc" id="L119">		long duration = startedGraphingDetailsAt - startedGraphingSummariesAt;</span>
+
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">		if (render) {</span>
+<span class="fc" id="L122">	        System.err.flush();</span>
+<span class="fc" id="L123">	        System.out.flush();</span>
+<span class="fc" id="L124">        	System.out.println(&quot;(&quot; + duration / 1000 + &quot;sec)&quot;);</span>
+<span class="fc" id="L125">        	System.out.print(&quot;Writing/diagramming details&quot;);</span>
+		}
+
+<span class="fc" id="L128">		return duration;</span>
+	}
+
+	@Override
+	public void graphingDetailsProgressed(Table table) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">		if (render) {</span>
+<span class="fc" id="L134">			System.out.print('.');</span>
+		}
+<span class="fc" id="L136">	}</span>
+
+	@Override
+	public long finishedGatheringDetails() {
+<span class="fc" id="L140">		finishedAt = System.currentTimeMillis();</span>
+<span class="fc" id="L141">		long duration = finishedAt - startedGraphingDetailsAt;</span>
+
+<span class="fc bfc" id="L143" title="All 2 branches covered.">		if (render) {</span>
+<span class="fc" id="L144">	        System.err.flush();</span>
+<span class="fc" id="L145">	        System.out.flush();</span>
+<span class="fc" id="L146">            System.out.println(&quot;(&quot; + duration / 1000 + &quot;sec)&quot;);</span>
+		}
+
+<span class="fc" id="L149">		return duration;</span>
+	}
+
+	@Override
+	public long finished(Collection&lt;Table&gt; tables, Config config) {
+<span class="fc" id="L154">		finishedAt = System.currentTimeMillis();</span>
+<span class="fc" id="L155">		long duration = finishedAt - startedAt;</span>
+
+<span class="fc bfc" id="L157" title="All 2 branches covered.">		if (render) {</span>
+<span class="fc" id="L158">	        System.err.flush();</span>
+<span class="fc" id="L159">	        System.out.flush();</span>
+<span class="fc" id="L160">            System.out.println(&quot;Wrote relationship details of &quot; + tables.size() + &quot; tables/views to directory '&quot; + commandLineArguments.getOutputDirectory() + &quot;' in &quot; + duration / 1000 + &quot; seconds.&quot;);</span>
+<span class="fc" id="L161">            System.out.println(&quot;View the results by opening &quot; + new File(commandLineArguments.getOutputDirectory(), &quot;index.html&quot;));</span>
+		}
+
+<span class="fc" id="L164">		return duration;</span>
+	}
+
+	@Override
+	public String recoverableExceptionEncountered(String msg, Exception exc, String sql) {
+<span class="nc" id="L169">        System.out.println();</span>
+<span class="nc" id="L170">        System.out.flush();</span>
+
+<span class="nc" id="L172">        String text = msg + &quot;: &quot; + exc;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (sql != null) {</span>
+<span class="nc" id="L174">        	text += &quot;: &quot; + sql;</span>
+        }
+
+<span class="nc" id="L177">        return text;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

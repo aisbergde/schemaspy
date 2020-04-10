@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableMeta.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.xml</a> &gt; <span class="el_source">TableMeta.java</span></div><h1>TableMeta.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.input.dbms.xml;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+
+/**
+ * Additional metadata about a table as expressed in XML instead of from
+ * the database.
+ *
+ * @author John Currier
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class TableMeta {
+    private final String name;
+    private final String comments;
+<span class="fc" id="L48">    private final List&lt;TableColumnMeta&gt; columns = new ArrayList&lt;&gt;();</span>
+    private final String remoteCatalog;
+    private final String remoteSchema;
+
+<span class="fc" id="L52">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L54">    TableMeta(Node tableNode) {</span>
+<span class="fc" id="L55">        NamedNodeMap attribs = tableNode.getAttributes();</span>
+
+<span class="fc" id="L57">        name = attribs.getNamedItem(&quot;name&quot;).getNodeValue();</span>
+
+<span class="fc" id="L59">        Node node = attribs.getNamedItem(&quot;comments&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (node == null) {</span>
+<span class="fc" id="L61">            node = attribs.getNamedItem(&quot;remarks&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (Objects.nonNull(node)) {</span>
+<span class="nc" id="L63">                LOGGER.warn(&quot;&lt;remarks&gt; has been deprecated&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (node != null) {</span>
+<span class="fc" id="L67">            String tmp = node.getNodeValue().trim();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            comments = tmp.length() == 0 ? null : tmp;</span>
+<span class="fc" id="L69">        } else {</span>
+<span class="fc" id="L70">            comments = null;</span>
+        }
+
+<span class="fc" id="L73">        node = attribs.getNamedItem(&quot;remoteSchema&quot;);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        remoteSchema = node == null ? null : node.getNodeValue().trim();</span>
+
+<span class="fc" id="L76">        node = attribs.getNamedItem(&quot;remoteCatalog&quot;);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        remoteCatalog = node == null ? null : node.getNodeValue().trim();</span>
+
+<span class="fc" id="L79">        LOGGER.debug(&quot;Found XML table metadata for {} remoteCatalog: {} remoteSchema: {} comments: {}&quot;, name, remoteCatalog, remoteSchema, comments);</span>
+
+<span class="fc" id="L81">        NodeList columnNodes = ((Element)tableNode.getChildNodes()).getElementsByTagName(&quot;column&quot;);</span>
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (int i = 0; i &lt; columnNodes.getLength(); ++i) {</span>
+<span class="fc" id="L84">            Node colNode = columnNodes.item(i);</span>
+<span class="fc" id="L85">            columns.add(new TableColumnMeta(colNode));</span>
+        }
+<span class="fc" id="L87">    }</span>
+
+    public String getName() {
+<span class="fc" id="L90">        return name;</span>
+    }
+
+    public String getComments() {
+<span class="fc" id="L94">        return comments;</span>
+    }
+
+    public List&lt;TableColumnMeta&gt; getColumns() {
+<span class="fc" id="L98">        return columns;</span>
+    }
+
+    public String getRemoteCatalog() {
+<span class="fc" id="L102">        return remoteCatalog;</span>
+    }
+    
+    public String getRemoteSchema() {
+<span class="fc" id="L106">        return remoteSchema;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

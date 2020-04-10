@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaMeta.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.xml</a> &gt; <span class="el_source">SchemaMeta.java</span></div><h1>SchemaMeta.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2010 John Currier
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2017, 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.input.dbms.xml;
+
+import org.schemaspy.Config;
+import org.schemaspy.model.InvalidConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamSource;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
+import javax.xml.validation.Validator;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Additional metadata about a schema as expressed in XML instead of from
+ * the database.
+ *
+ * @author John Currier
+ * @author Wojciech Kasa
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class SchemaMeta {
+<span class="fc" id="L61">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L63">    private final List&lt;TableMeta&gt; tables = new ArrayList&lt;&gt;();</span>
+    private final String comments;
+    private final File metaFile;
+
+<span class="fc" id="L67">    public SchemaMeta(String xmlMeta, String dbName, String schema) {</span>
+<span class="fc" id="L68">        File meta = new File(xmlMeta);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (meta.isDirectory()) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            String filename = (schema == null ? dbName : schema) + &quot;.meta.xml&quot;;</span>
+<span class="nc" id="L71">            meta = new File(meta, filename);</span>
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (!meta.exists()) {</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (Config.getInstance().isOneOfMultipleSchemas()) {</span>
+                    // don't force all of the &quot;one of many&quot; schemas to have metafiles
+<span class="nc" id="L76">                    LOGGER.info(&quot;Meta directory \&quot;{}\&quot; should contain a file named \&quot;{}\&quot;&quot;, xmlMeta, filename);</span>
+<span class="nc" id="L77">                    comments = null;</span>
+<span class="nc" id="L78">                    metaFile = null;</span>
+<span class="nc" id="L79">                    return;</span>
+                }
+
+<span class="nc" id="L82">                throw new InvalidConfigurationException(&quot;Meta directory \&quot;&quot; + xmlMeta + &quot;\&quot; must contain a file named \&quot;&quot; + filename + '\&quot;');</span>
+            }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        } else if (!meta.exists()) {</span>
+<span class="nc" id="L85">            throw new InvalidConfigurationException(&quot;Specified meta file \&quot;&quot; + xmlMeta + &quot;\&quot; does not exist&quot;);</span>
+        }
+
+<span class="fc" id="L88">        metaFile = meta;</span>
+
+<span class="fc" id="L90">        Document doc = parse(metaFile);</span>
+
+<span class="fc" id="L92">        NodeList commentsNodes = doc.getElementsByTagName(&quot;comments&quot;);</span>
+<span class="pc bpc" id="L93" title="1 of 6 branches missed.">        if (commentsNodes != null &amp;&amp; commentsNodes.getLength() &gt; 0 &amp;&amp; commentsNodes.item(0).hasChildNodes())</span>
+<span class="fc" id="L94">            comments = commentsNodes.item(0).getTextContent();</span>
+        else
+<span class="fc" id="L96">            comments = null;</span>
+
+<span class="fc" id="L98">        NodeList tablesNodes = doc.getElementsByTagName(&quot;tables&quot;);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (tablesNodes != null) {</span>
+<span class="fc" id="L100">            NodeList tableNodes = ((Element)tablesNodes.item(0)).getElementsByTagName(&quot;table&quot;);</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for (int i = 0; i &lt; tableNodes.getLength(); ++i) {</span>
+<span class="fc" id="L103">                Node tableNode = tableNodes.item(i);</span>
+<span class="fc" id="L104">                TableMeta tableMeta = new TableMeta(tableNode);</span>
+<span class="fc" id="L105">                tables.add(tableMeta);</span>
+            }
+        }
+<span class="fc" id="L108">    }</span>
+
+    /**
+     * Comments that describe the schema
+     */
+    public String getComments() {
+<span class="fc" id="L114">        return comments;</span>
+    }
+
+    public File getFile() {
+<span class="nc" id="L118">        return metaFile;</span>
+    }
+
+    public List&lt;TableMeta&gt; getTables() {
+<span class="fc" id="L122">        return tables;</span>
+    }
+
+    private void validate(Document document) throws SAXException, IOException {
+        // create a SchemaFactory capable of understanding WXS schemas
+<span class="fc" id="L127">        SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);</span>
+
+        // load a WXS schema, represented by a Schema instance
+<span class="fc" id="L130">        InputStream xsl = getClass().getResourceAsStream(&quot;/schemaspy.meta.xsd&quot;);</span>
+
+<span class="fc" id="L132">        Schema schema = factory.newSchema(new StreamSource(xsl));</span>
+
+        // create a Validator instance, which can be used to validate an instance document
+<span class="fc" id="L135">        Validator validator = schema.newValidator();</span>
+<span class="fc" id="L136">        validator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, &quot;&quot;);</span>
+<span class="fc" id="L137">        validator.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, &quot;&quot;);</span>
+
+        // validate the DOM tree
+<span class="fc" id="L140">        validator.validate(new DOMSource(document));</span>
+<span class="fc" id="L141">    }</span>
+
+    private Document parse(File file) {
+        DocumentBuilder docBuilder;
+        Document doc;
+<span class="fc" id="L146">        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();</span>
+<span class="fc" id="L147">        factory.setNamespaceAware(true);</span>
+<span class="fc" id="L148">        factory.setIgnoringElementContentWhitespace(true);</span>
+<span class="fc" id="L149">        factory.setIgnoringComments(true);</span>
+        try {
+<span class="fc" id="L151">            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);</span>
+<span class="nc" id="L152">        } catch (ParserConfigurationException e) {</span>
+<span class="nc" id="L153">            LOGGER.warn(&quot;Failed to enable secure processing for DocumentBuilderFactory&quot;, e);</span>
+<span class="fc" id="L154">        }</span>
+
+        try {
+<span class="fc" id="L157">            docBuilder = factory.newDocumentBuilder();</span>
+<span class="nc" id="L158">        } catch (ParserConfigurationException exc) {</span>
+<span class="nc" id="L159">            throw new InvalidConfigurationException(&quot;Invalid XML parser configuration&quot;, exc);</span>
+<span class="fc" id="L160">        }</span>
+
+        try {
+<span class="fc" id="L163">            LOGGER.info(&quot;Parsing {}&quot;, file);</span>
+<span class="fc" id="L164">            doc = docBuilder.parse(file);</span>
+<span class="nc" id="L165">        } catch (SAXException exc) {</span>
+<span class="nc" id="L166">            throw new InvalidConfigurationException(&quot;Failed to parse &quot; + file, exc);</span>
+<span class="nc" id="L167">        } catch (IOException exc) {</span>
+<span class="nc" id="L168">            throw new InvalidConfigurationException(&quot;Could not read &quot; + file + &quot;:&quot;, exc);</span>
+<span class="fc" id="L169">        }</span>
+        try {
+<span class="fc" id="L171">            validate(doc);</span>
+<span class="nc" id="L172">        } catch (SAXException | IOException exc) {</span>
+<span class="nc" id="L173">            LOGGER.warn(&quot;Failed to validate {}: {}&quot;, file, exc.getMessage(), exc);</span>
+<span class="fc" id="L174">        }</span>
+
+<span class="fc" id="L176">        return doc;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndexService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">IndexService.java</span></div><h1>IndexService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2019 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.Config;
+import org.schemaspy.model.Database;
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.schemaspy.model.TableIndex;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Comparator;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+import static java.util.Optional.ofNullable;
+
+public class IndexService {
+
+<span class="fc" id="L43">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final SqlService sqlService;
+
+<span class="fc" id="L47">    public IndexService(SqlService sqlService) {</span>
+<span class="fc" id="L48">        this.sqlService = sqlService;</span>
+<span class="fc" id="L49">    }</span>
+
+    public void gatherIndexes(Database database, Table table) throws SQLException {
+<span class="fc" id="L52">        initIndexes(database, table);</span>
+<span class="fc" id="L53">        initPrimaryKeys(database, table);</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Initialize index information
+     *
+     * @throws SQLException
+     */
+    private void initIndexes(Database db, Table table) throws SQLException {
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (table.isView() || table.isRemote()) {</span>
+<span class="nc" id="L63">            return;</span>
+        }
+
+        // first try to initialize using the index query spec'd in the .properties
+        // do this first because some DB's (e.g. Oracle) do 'bad' things with getIndexInfo()
+        // (they try to do a DDL analyze command that has some bad side-effects)
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (initIndexes(db, table, Config.getInstance().getDbProperties().getProperty(&quot;selectIndexesSql&quot;))) {</span>
+<span class="nc" id="L70">            return;</span>
+        }
+
+        // couldn't, so try the old fashioned approach
+<span class="fc" id="L74">        try (ResultSet rs = sqlService.getDatabaseMetaData().getIndexInfo(table.getCatalog(), table.getSchema(), table.getName(), false, true)) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            while (rs.next()) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (isIndexRow(rs)) {</span>
+<span class="fc" id="L77">                    addIndex(table, rs);</span>
+                }
+            }
+<span class="nc" id="L80">        } catch (SQLException exc) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (!table.isLogical()) {</span>
+<span class="nc" id="L82">                LOGGER.warn(&quot;Unable to extract index info for table '{}' in schema '{}': {}&quot;, table.getName(), table.getContainer(), exc.getMessage(), exc);</span>
+            }
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">    }</span>
+
+    //This is to handle a problem with informix and lvarchar Issue 215. It's been reported to IBM.
+    //According to DatabaseMetaData.getIndexInfo() ORDINAL_POSITION is zero when type is tableIndexStatistic.
+    //Problem with informix is that lvarchar is reported back as TYPE = tableIndexOther and ORDINAL_POSITION = 0.
+    private static boolean isIndexRow(ResultSet rs) throws SQLException {
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        return rs.getShort(&quot;TYPE&quot;) != DatabaseMetaData.tableIndexStatistic &amp;&amp; rs.getShort(&quot;ORDINAL_POSITION&quot;) &gt; 0;</span>
+    }
+
+    /**
+     * Try to initialize index information based on the specified SQL
+     *
+     * @return boolean &lt;code&gt;true&lt;/code&gt; if it worked, otherwise &lt;code&gt;false&lt;/code&gt;
+     */
+    private boolean initIndexes(Database db, Table table, String selectIndexesSql) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (selectIndexesSql == null) {</span>
+<span class="fc" id="L101">            return false;</span>
+        }
+<span class="nc" id="L103">        try (PreparedStatement preparedStatement = sqlService.prepareStatement(selectIndexesSql, db, table.getName());</span>
+<span class="nc" id="L104">             ResultSet rs = preparedStatement.executeQuery()) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            while (rs.next()) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (rs.getShort(&quot;TYPE&quot;) != DatabaseMetaData.tableIndexStatistic) {</span>
+<span class="nc" id="L107">                    addIndex(table, rs);</span>
+                }
+            }
+<span class="nc" id="L110">        } catch (SQLException sqlException) {</span>
+<span class="nc" id="L111">            LOGGER.warn(&quot;Failed to query index information with SQL: {}&quot;, selectIndexesSql, sqlException);</span>
+<span class="nc" id="L112">            return false;</span>
+<span class="nc" id="L113">        }</span>
+<span class="nc" id="L114">        return true;</span>
+    }
+
+    /**
+     * @param rs
+     * @throws SQLException
+     */
+    private static void addIndex(Table table, ResultSet rs) throws SQLException {
+<span class="fc" id="L122">        String indexName = rs.getString(&quot;INDEX_NAME&quot;);</span>
+
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (indexName == null) {</span>
+<span class="nc" id="L125">            return;</span>
+        }
+
+<span class="fc" id="L128">        TableIndex index = table.getIndex(indexName);</span>
+
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (index == null) {</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            index = new TableIndex(indexName, !rs.getBoolean(&quot;NON_UNIQUE&quot;));</span>
+<span class="fc" id="L132">            table.getIndexesMap().put(index.getName(), index);</span>
+        }
+
+<span class="fc" id="L135">        index.addColumn(table.getColumn(rs.getString(&quot;COLUMN_NAME&quot;)), rs.getString(&quot;ASC_OR_DESC&quot;));</span>
+<span class="fc" id="L136">    }</span>
+
+    /**
+     *
+     * @throws SQLException
+     */
+    private void initPrimaryKeys(Database database, Table table) throws SQLException {
+<span class="fc" id="L143">        LOGGER.debug(&quot;Querying primary keys for {}&quot;, table.getFullName());</span>
+<span class="fc" id="L144">        String sql = Config.getInstance().getDbProperties().getProperty(&quot;selectPrimaryKeysSql&quot;);</span>
+        try {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (Objects.nonNull(sql)) {</span>
+<span class="nc" id="L147">                try (PreparedStatement preparedStatement = sqlService.prepareStatement(sql, database, table.getName());</span>
+<span class="nc" id="L148">                     ResultSet resultSet = preparedStatement.executeQuery()) {</span>
+<span class="nc" id="L149">                        processPrimaryKeyResultSet(table, resultSet);</span>
+<span class="nc" id="L150">                }</span>
+            } else {
+<span class="fc" id="L152">                try (ResultSet resultSet = sqlService</span>
+<span class="fc" id="L153">                        .getDatabaseMetaData()</span>
+<span class="fc" id="L154">                        .getPrimaryKeys(table.getCatalog(), table.getSchema(), table.getName())) {</span>
+<span class="fc" id="L155">                    processPrimaryKeyResultSet(table, resultSet);</span>
+                }
+            }
+<span class="nc" id="L158">        } catch (SQLException exc) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (!table.isLogical()) {</span>
+<span class="nc" id="L160">                throw exc;</span>
+            }
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">    }</span>
+
+    private void processPrimaryKeyResultSet(final Table table, final ResultSet resultSet) throws SQLException {
+<span class="fc" id="L166">        Set&lt;PrimaryKeyColumn&gt; primaryKeyColumns = new TreeSet&lt;&gt;(Comparator.comparingInt(p -&gt; p.seqno));</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        while (resultSet.next()) {</span>
+<span class="fc" id="L168">            primaryKeyColumns.add(new PrimaryKeyColumn(resultSet));</span>
+        }
+<span class="fc" id="L170">        primaryKeyColumns.forEach(primaryKeyColumn -&gt; {</span>
+<span class="fc" id="L171">            TableColumn tableColumn = table.getColumn(primaryKeyColumn.column);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (Objects.nonNull(tableColumn)) {</span>
+<span class="fc" id="L173">                table.setPrimaryColumn(tableColumn);</span>
+<span class="fc" id="L174">                updateIndex(primaryKeyColumn.name, table, tableColumn);</span>
+            } else {
+<span class="nc" id="L176">                LOGGER.error(</span>
+                        &quot;Found PrimaryKey index '{}' with column '{}.{}.{}.{}'&quot; +
+                                &quot;, but was unable to find column in table '{}'&quot;,
+                        primaryKeyColumn.name,
+                        primaryKeyColumn.catalog,
+                        primaryKeyColumn.schema,
+                        primaryKeyColumn.table,
+                        primaryKeyColumn.column,
+<span class="nc" id="L184">                        table.getFullName()</span>
+                );
+            }
+<span class="fc" id="L187">        });</span>
+
+<span class="fc" id="L189">    }</span>
+
+    private static void updateIndex(String pkName, Table table, TableColumn tableColumn) {
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (Objects.nonNull(pkName)) {</span>
+<span class="fc" id="L193">            TableIndex tableIndex = table.getIndex(pkName);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if(Objects.nonNull(tableIndex)) {</span>
+<span class="fc" id="L195">                tableIndex.setIsPrimaryKey(true);</span>
+            } else {
+<span class="fc" id="L197">                LOGGER.debug(&quot;Found PK for table '{}' with pk name '{}', but index hasn't been found&quot;, table.getName(), pkName);</span>
+            }
+<span class="fc" id="L199">        } else {</span>
+<span class="fc" id="L200">            String syntheticName = table.getName() + &quot;_s_pk&quot;;</span>
+<span class="fc" id="L201">            TableIndex tableIndex = ofNullable(table.getIndex(syntheticName)).orElseGet(</span>
+                    () -&gt; {
+<span class="fc" id="L203">                        LOGGER.info(&quot;Found PK without index name created index '{}' for table '{}'&quot;, syntheticName, table.getName());</span>
+<span class="fc" id="L204">                        TableIndex syntheticTableIndex = new TableIndex(syntheticName, true);</span>
+<span class="fc" id="L205">                        table.getIndexesMap().put(syntheticTableIndex.getName(), syntheticTableIndex);</span>
+<span class="fc" id="L206">                        return syntheticTableIndex;</span>
+                    });
+<span class="fc" id="L208">            tableIndex.addColumn(tableColumn, null);</span>
+<span class="fc" id="L209">            tableIndex.setIsPrimaryKey(true);</span>
+<span class="fc" id="L210">            LOGGER.debug(&quot;Found PK without index name, added column '{}' to index '{}' in table '{}'&quot;, tableColumn.getName(), syntheticName, table.getName());</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    private class PrimaryKeyColumn {
+        public final String catalog;
+        public final String schema;
+        public final String table;
+        public final String column;
+        public final String name;
+        public final int seqno;
+
+<span class="fc" id="L222">        public PrimaryKeyColumn(ResultSet resultSet) throws SQLException {</span>
+<span class="fc" id="L223">            this.catalog = resultSet.getString(&quot;TABLE_CAT&quot;);</span>
+<span class="fc" id="L224">            this.schema = resultSet.getString(&quot;TABLE_SCHEM&quot;);</span>
+<span class="fc" id="L225">            this.table = resultSet.getString(&quot;TABLE_NAME&quot;);</span>
+<span class="fc" id="L226">            this.column = resultSet.getString(&quot;COLUMN_NAME&quot;);</span>
+<span class="fc" id="L227">            this.name = resultSet.getString(&quot;PK_NAME&quot;);</span>
+<span class="fc" id="L228">            this.seqno = resultSet.getShort(&quot;KEY_SEQ&quot;);</span>
+<span class="fc" id="L229">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

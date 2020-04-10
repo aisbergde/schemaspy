@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForeignKeyConstraint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">ForeignKeyConstraint.java</span></div><h1>ForeignKeyConstraint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Daniel Watt
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import static java.sql.DatabaseMetaData.*;
+
+/**
+ * Represents a &lt;a href='http://en.wikipedia.org/wiki/Foreign_key'&gt;
+ * Foreign Key Constraint&lt;/a&gt; that &quot;ties&quot; a child table to a parent table
+ * via foreign and primary keys.
+ *
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Wojciech Kasa
+ * @author Daniel Watt
+ */
+public class ForeignKeyConstraint implements Comparable&lt;ForeignKeyConstraint&gt; {
+    private final String name;
+    private Table parentTable;
+<span class="fc" id="L48">    private final List&lt;TableColumn&gt; parentColumns = new ArrayList&lt;&gt;();</span>
+    private final Table childTable;
+<span class="fc" id="L50">    private final List&lt;TableColumn&gt; childColumns = new ArrayList&lt;&gt;();</span>
+    private final int deleteRule;
+    private final int updateRule;
+<span class="fc" id="L53">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    /**
+     * Construct a foreign key for the specified child table.
+     * Relationship details will be added later.
+     *
+     * @param child
+     * @param name
+     * @param deleteRule
+     */
+<span class="fc" id="L63">    public ForeignKeyConstraint(Table child, String name, int updateRule, int deleteRule) {</span>
+<span class="fc" id="L64">        this.name = name; // implied constraints will have a null name and override getName()</span>
+<span class="fc" id="L65">        LOGGER.debug(&quot;Adding foreign key constraint '{}' to {}&quot;, getName(), child.getFullName());</span>
+<span class="fc" id="L66">        childTable = child;</span>
+<span class="fc" id="L67">        this.deleteRule = deleteRule;</span>
+<span class="fc" id="L68">        this.updateRule = updateRule;</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * This constructor is intended for use &lt;b&gt;after&lt;/b&gt; all of the tables have been
+     * found in the system.  One impact of using this constructor is that it will
+     * &quot;glue&quot; the two tables together through their columns.
+     *
+     * @param parentColumn
+     * @param childColumn
+     */
+    public ForeignKeyConstraint(TableColumn parentColumn, TableColumn childColumn,
+                                int updateRule, int deleteRule) {
+<span class="fc" id="L81">        this(childColumn.getTable(), null, updateRule, deleteRule);</span>
+
+<span class="fc" id="L83">        addChildColumn(childColumn);</span>
+<span class="fc" id="L84">        addParentColumn(parentColumn);</span>
+
+<span class="fc" id="L86">        childColumn.addParent(parentColumn, this);</span>
+<span class="fc" id="L87">        parentColumn.addChild(childColumn, this);</span>
+<span class="fc" id="L88">    }</span>
+
+    /**
+     * Same as {@link #ForeignKeyConstraint(TableColumn, TableColumn, int, int)},
+     * but defaults updateRule and deleteRule to
+     * {@link java.sql.DatabaseMetaData#importedKeyNoAction}.
+     *
+     * @param parentColumn
+     * @param childColumn
+     */
+    public ForeignKeyConstraint(TableColumn parentColumn, TableColumn childColumn) {
+<span class="fc" id="L99">        this(parentColumn, childColumn, importedKeyNoAction, importedKeyNoAction);</span>
+<span class="fc" id="L100">    }</span>
+
+    /**
+     * Add a &quot;parent&quot; side to the constraint.
+     *
+     * @param column
+     */
+    public void addParentColumn(TableColumn column) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (column != null) {</span>
+<span class="fc" id="L109">            parentColumns.add(column);</span>
+<span class="fc" id="L110">            parentTable = column.getTable();</span>
+        }
+<span class="fc" id="L112">    }</span>
+
+    /**
+     * Add a &quot;child&quot; side to the constraint.
+     *
+     * @param column
+     */
+    public void addChildColumn(TableColumn column) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (column != null) {</span>
+<span class="fc" id="L121">            childColumns.add(column);</span>
+        }
+<span class="fc" id="L123">    }</span>
+
+    /**
+     * Returns the name of the constraint
+     *
+     * @return
+     */
+    public String getName() {
+<span class="fc" id="L131">        return name;</span>
+    }
+
+    /**
+     * Returns the parent table (the table that contains the referenced primary key
+     * column).
+     *
+     * @return
+     */
+    public Table getParentTable() {
+<span class="fc" id="L141">        return parentTable;</span>
+    }
+
+    /**
+     * Returns all of the primary key columns that are referenced by this constraint.
+     *
+     * @return
+     */
+    public List&lt;TableColumn&gt; getParentColumns() {
+<span class="fc" id="L150">        return Collections.unmodifiableList(parentColumns);</span>
+    }
+
+    /**
+     * Returns the table on the &quot;child&quot; end of the relationship (contains the foreign
+     * key that references the parent table's primary key).
+     *
+     * @return
+     */
+    public Table getChildTable() {
+<span class="fc" id="L160">        return childTable;</span>
+    }
+
+    /**
+     * Returns all of the foreign key columns that are referenced by this constraint.
+     *
+     * @return
+     */
+    public List&lt;TableColumn&gt; getChildColumns() {
+<span class="fc" id="L169">        return Collections.unmodifiableList(childColumns);</span>
+    }
+
+    /**
+     * Returns the delete rule for this constraint.
+     *
+     * @see {@link java.sql.DatabaseMetaData#importedKeyCascade}
+     */
+    public int getDeleteRule() {
+<span class="fc" id="L178">        return deleteRule;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this constraint should
+     * &lt;a href='http://en.wikipedia.org/wiki/Cascade_delete'&gt;cascade deletions&lt;/code&gt;.
+     *
+     * @return
+     */
+    public boolean isCascadeOnDelete() {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        return getDeleteRule() == importedKeyCascade;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if the constraint prevents the parent table
+     * from being deleted if child tables exist.
+     *
+     * @return
+     */
+    public boolean isRestrictDelete() {
+<span class="nc bnc" id="L198" title="All 4 branches missed.">        return getDeleteRule() == importedKeyNoAction || getDeleteRule() == importedKeyRestrict;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if the constraint indicates that the foreign key
+     * will be set to &lt;code&gt;null&lt;/code&gt; when the parent key is deleted.
+     *
+     * @return
+     */
+    public boolean isNullOnDelete() {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        return getDeleteRule() == importedKeySetNull;</span>
+    }
+
+    public String getDeleteRuleName() {
+<span class="nc bnc" id="L212" title="All 4 branches missed.">        switch (getDeleteRule()) {</span>
+            case importedKeyCascade:
+<span class="nc" id="L214">                return &quot;Cascade on delete&quot;;</span>
+
+            case importedKeyRestrict:
+            case importedKeyNoAction:
+<span class="nc" id="L218">                return &quot;Restrict delete&quot;;</span>
+
+            case importedKeySetNull:
+<span class="nc" id="L221">                return &quot;Null on delete&quot;;</span>
+
+            default:
+<span class="nc" id="L224">                return &quot;&quot;;</span>
+        }
+    }
+
+    public String getDeleteRuleDescription() {
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        switch (getDeleteRule()) {</span>
+            case importedKeyCascade:
+<span class="nc" id="L231">                return &quot;Cascade on delete:\nDeletion of parent deletes child&quot;;</span>
+
+            case importedKeyRestrict:
+            case importedKeyNoAction:
+<span class="nc" id="L235">                return &quot;Restrict delete:\nParent cannot be deleted if children exist&quot;;</span>
+
+            case importedKeySetNull:
+<span class="nc" id="L238">                return &quot;Null on delete:\nForeign key to parent set to NULL when parent deleted&quot;;</span>
+
+            default:
+<span class="nc" id="L241">                return &quot;&quot;;</span>
+        }
+    }
+
+    public String getDeleteRuleAlias() {
+<span class="nc bnc" id="L246" title="All 4 branches missed.">        switch (getDeleteRule()) {</span>
+            case importedKeyCascade:
+<span class="nc" id="L248">                return &quot;C&quot;;</span>
+
+            case importedKeyRestrict:
+            case importedKeyNoAction:
+<span class="nc" id="L252">                return &quot;R&quot;;</span>
+
+            case importedKeySetNull:
+<span class="nc" id="L255">                return &quot;N&quot;;</span>
+
+            default:
+<span class="nc" id="L258">                return &quot;&quot;;</span>
+        }
+    }
+
+    /**
+     * Returns the update rule for this constraint.
+     *
+     * @see {@link java.sql.DatabaseMetaData#importedKeyCascade}
+     */
+    public int getUpdateRule() {
+<span class="fc" id="L268">        return updateRule;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if this is an implied constraint or
+     * &lt;code&gt;false&lt;/code&gt; if it is &quot;real&quot;.
+     *
+     * Subclasses that implement implied constraints should override this method.
+     *
+     * @return
+     */
+    public boolean isImplied() {
+<span class="fc" id="L280">        return false;</span>
+    }
+
+    /**
+     * We have several types of constraints.
+     * This returns &lt;code&gt;true&lt;/code&gt; if the constraint came from the database
+     * metadata and not inferred by something else.
+     * This is different than {@link #isImplied()} in that implied relationships
+     * are a specific type of non-real relationships.
+     *
+     * @return
+     */
+    public boolean isReal() {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        return getClass() == ForeignKeyConstraint.class;</span>
+    }
+
+    /**
+     * Custom comparison method to deal with foreign key names that aren't
+     * unique across all schemas being evaluated
+     *
+     * @param other ForeignKeyConstraint
+     *
+     * @return
+     */
+    public int compareTo(ForeignKeyConstraint other) {
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L306">            return 0;</span>
+
+<span class="nc" id="L308">        int rc = getName().compareToIgnoreCase(other.getName());</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        if (rc == 0) {</span>
+            // should only get here if we're dealing with cross-schema references (rare)
+<span class="nc" id="L311">            String ours = getChildColumns().get(0).getTable().getContainer();</span>
+<span class="nc" id="L312">            String theirs = other.getChildColumns().get(0).getTable().getContainer();</span>
+<span class="nc bnc" id="L313" title="All 4 branches missed.">            if (ours != null &amp;&amp; theirs != null)</span>
+<span class="nc" id="L314">                rc = ours.compareToIgnoreCase(theirs);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            else if (ours == null)</span>
+<span class="nc" id="L316">                rc = -1;</span>
+            else
+<span class="nc" id="L318">                rc = 1;</span>
+        }
+
+<span class="nc" id="L321">        return rc;</span>
+    }
+
+    /**
+     * Static method that returns a string representation of the specified
+     * list of {@link TableColumn columns}.
+     *
+     * @param columns
+     * @return
+     */
+    public static String toString(List&lt;TableColumn&gt; columns) {
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (columns.size() == 1)</span>
+<span class="nc" id="L333">            return columns.iterator().next().toString();</span>
+<span class="nc" id="L334">        return columns.toString();</span>
+    }
+
+    /**
+     * Returns a string representation of this foreign key constraint.
+     *
+     * @return
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L344">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L345">        buf.append(childTable.getName());</span>
+<span class="nc" id="L346">        buf.append('.');</span>
+<span class="nc" id="L347">        buf.append(toString(childColumns));</span>
+<span class="nc" id="L348">        buf.append(&quot; references &quot;);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (parentTable.isRemote()) {</span>
+<span class="nc" id="L350">            buf.append(parentTable.getContainer());</span>
+<span class="nc" id="L351">            buf.append('.');</span>
+        }
+<span class="nc" id="L353">        buf.append(parentTable.getName());</span>
+<span class="nc" id="L354">        buf.append('.');</span>
+<span class="nc" id="L355">        buf.append(toString(parentColumns));</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L357">            buf.append(&quot; via &quot;);</span>
+<span class="nc" id="L358">            buf.append(name);</span>
+        }
+
+<span class="nc" id="L361">        return buf.toString();</span>
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (this == obj) {</span>
+<span class="fc" id="L367">            return true;</span>
+        }
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (obj instanceof ForeignKeyConstraint) {</span>
+<span class="fc" id="L370">            ForeignKeyConstraint other = (ForeignKeyConstraint)obj;</span>
+<span class="pc bpc" id="L371" title="1 of 4 branches missed.">            return parentTable == other.parentTable &amp;&amp; childTable == other.childTable;</span>
+        }
+<span class="nc" id="L373">        return false;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        int result = parentTable != null ? parentTable.hashCode() : 0;</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        result = 31 * result + (childTable != null ? childTable.hashCode() : 0);</span>
+<span class="nc" id="L380">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

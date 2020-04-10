@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">DatabaseObject.java</span></div><h1>DatabaseObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2016 Ismail Simsek
+ * Copyright (C) 2017 Wojciech Kasa
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.model;
+
+import java.util.Set;
+
+/**
+ * Created by rkasa on 2016-04-15.
+ * @author Rafal Kasa
+ * @author Ismail Simsek
+ * @author Wojciech Kasa
+ */
+public class DatabaseObject implements Comparable&lt;DatabaseObject&gt;{
+    private String name;
+    private final String fullName;
+    private final String typeName;
+    private final Integer type;
+    private final int length;
+    private final Set&lt;TableColumn&gt; parents;
+    private final Set&lt;TableColumn&gt; children;
+
+<span class="fc" id="L40">    public DatabaseObject(TableColumn object) {</span>
+<span class="fc" id="L41">        this.name = object.getName();</span>
+<span class="fc" id="L42">        this.fullName = object.getTable().getFullName() + &quot;.&quot; + object.getName();</span>
+<span class="fc" id="L43">        this.typeName = object.getTypeName();</span>
+<span class="fc" id="L44">        this.type = object.getType();</span>
+<span class="fc" id="L45">        this.length = object.getLength();</span>
+<span class="fc" id="L46">        this.parents = object.getParents();</span>
+<span class="fc" id="L47">        this.children = object.getChildren();</span>
+
+<span class="fc" id="L49">    }</span>
+
+    public String getName() {
+<span class="fc" id="L52">        return name;</span>
+    }
+
+    public void setName(String name) {
+<span class="nc" id="L56">        this.name = name;</span>
+<span class="nc" id="L57">    }</span>
+
+    public String getTypeName() {
+<span class="nc" id="L60">        return typeName;</span>
+    }
+
+    public Integer getType() {
+<span class="fc" id="L64">        return type;</span>
+    }
+
+    public int getLength() {
+<span class="fc" id="L68">        return length;</span>
+    }
+
+    public Set&lt;TableColumn&gt; getParents() {
+<span class="nc" id="L72">        return parents;</span>
+    }
+
+    public Set&lt;TableColumn&gt; getChildren() {
+<span class="nc" id="L76">        return children;</span>
+    }
+
+    public String getFullName() {
+<span class="fc" id="L80">        return fullName;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L85">        return name;</span>
+    }
+    
+	@Override
+	public int compareTo(DatabaseObject column2) {
+<span class="fc" id="L90">        int rc = this.getFullName().compareToIgnoreCase(column2.getFullName());</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (rc == 0) {</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">            if (this.getType() != null &amp;&amp; column2.getType() != null)</span>
+            	// type is exact while typeName can be adorned with additional stuff (e.g. MSSQL appends &quot; identity&quot; for auto-inc keys)
+<span class="fc" id="L94">            	rc = this.getType().compareTo(column2.getType());</span>
+            else
+<span class="nc" id="L96">                rc = this.getTypeName().compareToIgnoreCase(column2.getTypeName());</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (rc == 0)</span>
+<span class="fc" id="L99">            rc = this.getLength() - column2.getLength();</span>
+<span class="fc" id="L100">        return rc;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

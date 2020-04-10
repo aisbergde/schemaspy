@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StyleSheet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.output.dot.schemaspy</a> &gt; <span class="el_source">StyleSheet.java</span></div><h1>StyleSheet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (c) 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.output.dot.schemaspy;
+
+import org.schemaspy.Config;
+import org.schemaspy.model.InvalidConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.StringTokenizer;
+
+import static org.schemaspy.output.dot.schemaspy.StyleSheetConst.*;
+
+/**
+ * Represents our CSS style sheet (CSS) with accessors for important
+ * data from that style sheet.
+ * The idea is that the CSS that will be used to render the HTML pages
+ * also determines the colors used in the generated ER diagrams.
+ *
+ * @author John Currier
+ * @author Thomas Traude
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+public class StyleSheet {
+
+<span class="fc" id="L53">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+<span class="fc" id="L55">    private static final ResourceFinder resourceFinder = new ResourceFinder();</span>
+
+    private static StyleSheet instance;
+    private final String css;
+    private String bodyBackgroundColor;
+    private String tableHeadBackgroundColor;
+    private String tableBackgroundColor;
+    private String indexedColumnBackgroundColor;
+    private String excludedColumnBackgroundColor;
+
+<span class="fc" id="L65">    private StyleSheet(String cssContent) {</span>
+<span class="fc" id="L66">        css = cssContent;</span>
+<span class="fc" id="L67">        parseCss();</span>
+<span class="fc" id="L68">    }</span>
+
+    private void parseCss() {
+<span class="fc" id="L71">        String cssNoComments = removeComments();</span>
+
+<span class="fc" id="L73">        StringTokenizer tokenizer = new StringTokenizer(cssNoComments, &quot;{}&quot;);</span>
+<span class="fc" id="L74">        String id = null;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        while (tokenizer.hasMoreTokens()) {</span>
+<span class="fc" id="L76">            String token = tokenizer.nextToken().trim();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (id == null) {</span>
+<span class="fc" id="L78">                id = token.toLowerCase();</span>
+            } else {
+<span class="fc" id="L80">                Map&lt;String, String&gt; attribs = parseAttributes(token);</span>
+<span class="fc" id="L81">                bindAttribute(id, attribs);</span>
+<span class="fc" id="L82">                id = null;</span>
+            }
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">    }</span>
+
+    private String removeComments() {
+<span class="fc" id="L88">        StringBuilder data = new StringBuilder(css);</span>
+
+<span class="fc" id="L90">        int startComment = data.indexOf(START_COMMENT);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        while (startComment != -1) {</span>
+<span class="fc" id="L92">            int endComment = data.indexOf(END_COMMENT);</span>
+<span class="fc" id="L93">            data.replace(startComment, endComment + END_COMMENT.length(), &quot;&quot;);</span>
+<span class="fc" id="L94">            startComment = data.indexOf(START_COMMENT);</span>
+<span class="fc" id="L95">        }</span>
+
+<span class="fc" id="L97">        return data.toString();</span>
+    }
+
+    private void bindAttribute(String id, Map&lt;String,String&gt; attribs) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (&quot;.diagram&quot;.equals(id))</span>
+<span class="fc" id="L102">            bodyBackgroundColor = attribs.get(BACKGROUND);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        else if (&quot;th.diagram&quot;.equals(id))</span>
+<span class="fc" id="L104">            tableHeadBackgroundColor = attribs.get(BACKGROUND_COLOR);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        else if (&quot;td.diagram&quot;.equals(id))</span>
+<span class="fc" id="L106">            tableBackgroundColor = attribs.get(BACKGROUND_COLOR);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        else if (&quot;.diagram .indexedcolumn&quot;.equals(id))</span>
+<span class="fc" id="L108">            indexedColumnBackgroundColor = attribs.get(BACKGROUND);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        else if (&quot;.excludedcolumn&quot;.equals(id))</span>
+<span class="fc" id="L110">            excludedColumnBackgroundColor = attribs.get(BACKGROUND);</span>
+<span class="fc" id="L111">    }</span>
+
+    /**
+     * Singleton accessor
+     *
+     * @return the singleton
+     * @throws ParseException
+     */
+    public static StyleSheet getInstance() {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (instance == null) {</span>
+<span class="fc" id="L121">            String cssFilename = Config.getInstance().getCss();</span>
+<span class="fc" id="L122">            String templateDirectory = Config.getInstance().getTemplateDirectory();</span>
+            try {
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (new File(cssFilename).exists()) {</span>
+<span class="nc" id="L125">                    LOGGER.info(&quot;Using external StyleSheet file: {}&quot;, cssFilename);</span>
+<span class="nc" id="L126">                    instance = new StyleSheet(getContent(getReader(null, cssFilename)));</span>
+                } else {
+<span class="fc" id="L128">                    instance = new StyleSheet(getContent(getReader(templateDirectory, cssFilename)));</span>
+                }
+<span class="nc" id="L130">            } catch (IOException exc) {</span>
+<span class="nc" id="L131">                throw new ParseException(&quot;Unable to find css '&quot; + cssFilename + &quot;' or same file in '&quot; + templateDirectory + &quot;'&quot; , exc);</span>
+<span class="fc" id="L132">            }</span>
+        }
+
+<span class="fc" id="L135">        return instance;</span>
+    }
+
+    private static String getContent(Reader reader) throws IOException {
+<span class="fc" id="L139">        BufferedReader bufferedReader = new BufferedReader(reader);</span>
+<span class="fc" id="L140">        String lineSeparator = System.getProperty(&quot;line.separator&quot;);</span>
+<span class="fc" id="L141">        StringBuilder data = new StringBuilder();</span>
+        String line;
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        while ((line = bufferedReader.readLine()) != null) {</span>
+<span class="fc" id="L145">            data.append(line);</span>
+<span class="fc" id="L146">            data.append(lineSeparator);</span>
+        }
+
+<span class="fc" id="L149">        return data.toString();</span>
+    }
+
+    private static Reader getReader(String parent, String fileName) {
+        try {
+<span class="fc" id="L154">            InputStream inputStream = resourceFinder.find(parent, fileName);</span>
+<span class="fc" id="L155">            return new InputStreamReader(inputStream, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L156">        } catch (ResourceNotFoundException rnfe) {</span>
+<span class="nc" id="L157">            throw new ParseException(&quot;Unable to find requested file: &quot; + fileName + &quot; in directory &quot; + parent, rnfe);</span>
+        }
+    }
+
+    private static Map&lt;String, String&gt; parseAttributes(String data) {
+<span class="fc" id="L162">        Map&lt;String, String&gt; attribs = new HashMap&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L165">            StringTokenizer attrTokenizer = new StringTokenizer(data, &quot;;&quot;);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            while (attrTokenizer.hasMoreTokens()) {</span>
+<span class="fc" id="L167">                StringTokenizer pairTokenizer = new StringTokenizer(attrTokenizer.nextToken(), &quot;:&quot;);</span>
+<span class="fc" id="L168">                String attribute = pairTokenizer.nextToken().trim().toLowerCase();</span>
+<span class="fc" id="L169">                String value = pairTokenizer.nextToken().trim().toLowerCase();</span>
+<span class="fc" id="L170">                attribs.put(attribute, value);</span>
+<span class="fc" id="L171">            }</span>
+<span class="nc" id="L172">        } catch (NoSuchElementException badToken) {</span>
+<span class="nc" id="L173">            LOGGER.warn(&quot;Failed to extract attributes from '{}'&quot;, data, badToken);</span>
+<span class="nc" id="L174">            throw badToken;</span>
+<span class="fc" id="L175">        }</span>
+
+<span class="fc" id="L177">        return attribs;</span>
+    }
+
+    public String getBodyBackground() {
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (bodyBackgroundColor == null)</span>
+<span class="nc" id="L182">            throw new MissingCssPropertyException(&quot;.diagram&quot;, BACKGROUND);</span>
+
+<span class="fc" id="L184">        return bodyBackgroundColor;</span>
+    }
+
+    public String getTableBackground() {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (tableBackgroundColor == null)</span>
+<span class="nc" id="L189">            throw new MissingCssPropertyException(&quot;td&quot;, BACKGROUND_COLOR);</span>
+
+<span class="fc" id="L191">        return tableBackgroundColor;</span>
+    }
+
+    public String getTableHeadBackground() {
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (tableHeadBackgroundColor == null)</span>
+<span class="nc" id="L196">            throw new MissingCssPropertyException(&quot;th&quot;, BACKGROUND_COLOR);</span>
+
+<span class="fc" id="L198">        return tableHeadBackgroundColor;</span>
+    }
+
+    public String getIndexedColumnBackground() {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (indexedColumnBackgroundColor == null)</span>
+<span class="nc" id="L203">            throw new MissingCssPropertyException(&quot;.diagram .indexedColumn&quot;, BACKGROUND);</span>
+
+<span class="fc" id="L205">        return indexedColumnBackgroundColor;</span>
+    }
+
+
+    public String getExcludedColumnBackgroundColor() {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (excludedColumnBackgroundColor == null)</span>
+<span class="nc" id="L211">            throw new MissingCssPropertyException(&quot;.excludedColumn&quot;, BACKGROUND);</span>
+
+<span class="nc" id="L213">        return excludedColumnBackgroundColor;</span>
+    }
+
+
+
+    /**
+     * Indicates that a css property was missing
+     */
+    public static class MissingCssPropertyException extends InvalidConfigurationException {
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * @param cssSection name of the css section
+         * @param propName name of the missing property in that section
+         */
+        public MissingCssPropertyException(String cssSection, String propName) {
+<span class="nc" id="L229">            super(&quot;Required property '&quot; + propName + &quot;' was not found for the definition of '&quot; + cssSection + &quot;'&quot;);</span>
+<span class="nc" id="L230">        }</span>
+    }
+
+    /**
+     * Indicates an exception in parsing the css
+     */
+    public static class ParseException extends InvalidConfigurationException {
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * @param cause root exception that caused the failure
+         */
+        public ParseException(String message, Exception cause) {
+<span class="nc" id="L243">            super(message, cause);</span>
+<span class="nc" id="L244">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

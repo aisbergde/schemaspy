@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CombinedMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.model</a> &gt; <span class="el_source">CombinedMap.java</span></div><h1>CombinedMap.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011, 2014 John Currier
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy.model;
+
+import org.schemaspy.util.CaseInsensitiveMap;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * A read-only map that treats both collections of Tables and Views as one
+ * combined collection.
+ * This is a bit strange, but it simplifies logic that otherwise treats
+ * the two as if they were one collection.
+ *
+ * @author John Currier
+ */
+class CombinedMap implements Map&lt;String, Table&gt; {
+    private final Map&lt;String, ? extends Table&gt; map1;
+    private final Map&lt;String, ? extends Table&gt; map2;
+
+<span class="fc" id="L40">    public CombinedMap(Map&lt;String, ? extends Table&gt; map1, Map&lt;String, ? extends Table&gt; map2)  {</span>
+<span class="fc" id="L41">        this.map1 = map1;</span>
+<span class="fc" id="L42">        this.map2 = map2;</span>
+<span class="fc" id="L43">    }</span>
+
+    @Override
+    public Table get(Object name) {
+<span class="fc" id="L47">        Table table = map1.get(name);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (table == null)</span>
+<span class="nc" id="L49">            table = map2.get(name);</span>
+<span class="fc" id="L50">        return table;</span>
+    }
+
+    @Override
+    public int size() {
+<span class="nc" id="L55">        return map1.size() + map2.size();</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="nc bnc" id="L60" title="All 4 branches missed.">        return map1.isEmpty() &amp;&amp; map2.isEmpty();</span>
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        return map1.containsKey(key) || map2.containsKey(key);</span>
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+<span class="nc bnc" id="L70" title="All 4 branches missed.">        return map1.containsValue(value) || map2.containsValue(value);</span>
+    }
+
+    @Override
+    public Table put(String name, Table table) {
+<span class="nc" id="L75">        throw new UnsupportedOperationException();</span>
+    }
+
+    /**
+     * Warning: potentially expensive operation
+     */
+    @Override
+    public Set&lt;String&gt; keySet() {
+<span class="nc" id="L83">        return getCombined().keySet();</span>
+    }
+
+    /**
+     * Warning: potentially expensive operation
+     */
+    @Override
+    public Set&lt;Entry&lt;String, Table&gt;&gt; entrySet() {
+<span class="nc" id="L91">        return getCombined().entrySet();</span>
+    }
+
+    /**
+     * Warning: potentially expensive operation
+     */
+    @Override
+    public Collection&lt;Table&gt; values() {
+<span class="nc" id="L99">        return getCombined().values();</span>
+    }
+
+    private Map&lt;String, Table&gt; getCombined() {
+<span class="nc" id="L103">        Map&lt;String, Table&gt; all = new CaseInsensitiveMap&lt;&gt;(size());</span>
+<span class="nc" id="L104">        all.putAll(map1);</span>
+<span class="nc" id="L105">        all.putAll(map2);</span>
+<span class="nc" id="L106">        return all;</span>
+    }
+
+    @Override
+    public Table remove(Object key) {
+<span class="nc" id="L111">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public void putAll(Map&lt;? extends String, ? extends Table&gt; table) {
+<span class="nc" id="L116">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc" id="L121">        throw new UnsupportedOperationException();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

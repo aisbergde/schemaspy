@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ColumnService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy.input.dbms.service</a> &gt; <span class="el_source">ColumnService.java</span></div><h1>ColumnService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2019 Nils Petzaell
+ *
+ * This file is part of SchemaSpy.
+ *
+ * SchemaSpy is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with SchemaSpy. If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package org.schemaspy.input.dbms.service;
+
+import org.schemaspy.Config;
+import org.schemaspy.model.Table;
+import org.schemaspy.model.TableColumn;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.sql.*;
+import java.util.Objects;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+public class ColumnService {
+
+<span class="fc" id="L35">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    private final SqlService sqlService;
+
+<span class="fc" id="L39">    public ColumnService(SqlService sqlService) {</span>
+<span class="fc" id="L40">        this.sqlService = sqlService;</span>
+<span class="fc" id="L41">    }</span>
+
+    public void gatherColumns(Table table) throws SQLException {
+<span class="fc" id="L44">        initColumns(table);</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">        if (!(table.isView() || table.isRemote())) {</span>
+<span class="nc" id="L46">            initColumnAutoUpdate(table, false);</span>
+        }
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * @throws SQLException
+     */
+    private void initColumns(Table table) throws SQLException {
+<span class="fc" id="L54">        synchronized (Table.class) {</span>
+<span class="fc" id="L55">            try (ResultSet rs = sqlService.getDatabaseMetaData().getColumns(table.getCatalog(), table.getSchema(), table.getName(), &quot;%&quot;)) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                while (rs.next())</span>
+<span class="fc" id="L57">                    addColumn(table, rs);</span>
+<span class="nc" id="L58">            } catch (SQLException exc) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                if (!table.isLogical()) {</span>
+<span class="nc" id="L60">                    throw new ColumnInitializationFailure(table, exc);</span>
+                }
+<span class="fc" id="L62">            }</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * @param rs - from {@link DatabaseMetaData#getColumns(String, String, String, String)}
+     * @throws SQLException
+     */
+    private void addColumn(Table table, ResultSet rs) throws SQLException {
+<span class="fc" id="L71">        String columnName = rs.getString(&quot;COLUMN_NAME&quot;);</span>
+
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (columnName == null)</span>
+<span class="nc" id="L74">            return;</span>
+
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (table.getColumn(columnName) == null) {</span>
+<span class="fc" id="L77">            TableColumn column = initColumn(table, rs);</span>
+<span class="fc" id="L78">            table.getColumnsMap().put(column.getName(), column);</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    private static TableColumn initColumn(Table table, ResultSet rs) throws SQLException {
+<span class="fc" id="L83">        TableColumn column = new TableColumn(table);</span>
+        // names and types are typically reused *many* times in a database,
+        // so keep a single instance of each distinct one
+        // (thanks to Mike Barnes for the suggestion)
+<span class="fc" id="L87">        String tmp = rs.getString(&quot;COLUMN_NAME&quot;);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        column.setName(tmp == null ? null : tmp.intern());</span>
+<span class="fc" id="L89">        tmp = rs.getString(&quot;TYPE_NAME&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        column.setTypeName(tmp == null ? &quot;unknown&quot; : tmp.intern());</span>
+<span class="fc" id="L91">        column.setType(rs.getInt(&quot;DATA_TYPE&quot;));</span>
+
+<span class="fc" id="L93">        column.setDecimalDigits(rs.getInt(&quot;DECIMAL_DIGITS&quot;));</span>
+<span class="fc" id="L94">        Number bufLength = (Number)rs.getObject(&quot;BUFFER_LENGTH&quot;);</span>
+<span class="pc bpc" id="L95" title="3 of 4 branches missed.">        if (bufLength != null &amp;&amp; bufLength.shortValue() &gt; 0)</span>
+<span class="nc" id="L96">            column.setLength(bufLength.shortValue());</span>
+        else
+<span class="fc" id="L98">            column.setLength(rs.getInt(&quot;COLUMN_SIZE&quot;));</span>
+
+<span class="fc" id="L100">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc" id="L101">        buf.append(column.getLength());</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (column.getDecimalDigits() &gt; 0) {</span>
+<span class="nc" id="L103">            buf.append(',');</span>
+<span class="nc" id="L104">            buf.append(column.getDecimalDigits());</span>
+        }
+<span class="fc" id="L106">        column.setDetailedSize(buf.toString());</span>
+
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        column.setNullable(rs.getInt(&quot;NULLABLE&quot;) == DatabaseMetaData.columnNullable);</span>
+<span class="fc" id="L109">        column.setDefaultValue(rs.getString(&quot;COLUMN_DEF&quot;));</span>
+<span class="fc" id="L110">        column.setComments(rs.getString(&quot;REMARKS&quot;));</span>
+<span class="fc" id="L111">        column.setId(rs.getInt(&quot;ORDINAL_POSITION&quot;) - 1);</span>
+
+<span class="fc" id="L113">        Pattern excludeIndirectColumns = Config.getInstance().getIndirectColumnExclusions();</span>
+<span class="fc" id="L114">        Pattern excludeColumns = Config.getInstance().getColumnExclusions();</span>
+
+<span class="fc" id="L116">        column.setAllExcluded(column.matches(excludeColumns));</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        column.setExcluded(column.isAllExcluded() || column.matches(excludeIndirectColumns));</span>
+<span class="fc" id="L118">        LOGGER.trace(&quot;Excluding column {}.{}: matches {}:{} {}:{}&quot;, column.getTable(), column.getName(), excludeColumns, column.isAllExcluded(), excludeIndirectColumns, column.matches(excludeIndirectColumns));</span>
+
+<span class="fc" id="L120">        return column;</span>
+    }
+
+    /**
+     * @param forceQuotes
+     * @throws SQLException
+     */
+    private void initColumnAutoUpdate(Table table, boolean forceQuotes) {
+        // we've got to get a result set with all the columns in it
+        // so we can ask if the columns are auto updated
+        // Ugh!!!  Should have been in DatabaseMetaData instead!!!
+<span class="nc" id="L131">        StringBuilder sql = new StringBuilder(&quot;select * from &quot;);</span>
+<span class="nc" id="L132">        sql.append(sqlService.getQualifiedTableName(</span>
+<span class="nc" id="L133">                table.getCatalog(),</span>
+<span class="nc" id="L134">                table.getSchema(),</span>
+<span class="nc" id="L135">                table.getName(),</span>
+                forceQuotes)
+        );
+
+<span class="nc" id="L139">        sql.append(&quot; where 0 = 1&quot;);</span>
+
+<span class="nc" id="L141">        try (PreparedStatement stmt = sqlService.getDatabaseMetaData().getConnection().prepareStatement(sql.toString());</span>
+<span class="nc" id="L142">             ResultSet rs = stmt.executeQuery()) {</span>
+
+<span class="nc" id="L144">            ResultSetMetaData rsMeta = rs.getMetaData();</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            for (int i = rsMeta.getColumnCount(); i &gt; 0; --i) {</span>
+<span class="nc" id="L146">                String columnName = rsMeta.getColumnName(i);</span>
+<span class="nc" id="L147">                TableColumn column = getColumn(table, columnName);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (Objects.isNull(column)) {</span>
+<span class="nc" id="L149">                    throw new InconsistencyException(&quot;Column information from DatabaseMetaData differs from ResultSetMetaData, expected to find column named: '&quot;+ columnName + &quot;' in &quot; + listColumns(table));</span>
+                }
+<span class="nc" id="L151">                column.setIsAutoUpdated(rsMeta.isAutoIncrement(i));</span>
+            }
+<span class="nc" id="L153">        } catch (SQLException exc) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (forceQuotes) {</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                if (!table.isLogical()) {</span>
+                    // don't completely choke just because we couldn't do this....
+<span class="nc" id="L157">                    LOGGER.warn(&quot;Failed to determine auto increment status: {}&quot;, exc.getMessage(), exc);</span>
+<span class="nc" id="L158">                    LOGGER.warn(&quot;SQL: {}&quot;, sql);</span>
+                }
+            } else {
+<span class="nc" id="L161">                initColumnAutoUpdate(table, true);</span>
+            }
+<span class="nc" id="L163">        }</span>
+<span class="nc" id="L164">    }</span>
+
+    private String listColumns(Table table) {
+<span class="nc" id="L167">        return table.getColumns().stream().map(TableColumn::getName).collect(Collectors.joining(&quot;','&quot;, &quot;['&quot;, &quot;']&quot;));</span>
+    }
+
+    private static TableColumn getColumn(Table table, String columnName) {
+<span class="nc" id="L171">        TableColumn column = table.getColumn(columnName);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (Objects.isNull(column)) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (columnName.startsWith(table.getName())) {</span>
+<span class="nc" id="L174">                column = table.getColumn(columnName.substring(table.getName().length() + 1 ));</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            } else if(columnName.startsWith(table.getFullName())) {</span>
+<span class="nc" id="L176">                column = table.getColumn(columnName.substring(table.getFullName().length() + 1 ));</span>
+            }
+        }
+<span class="nc" id="L179">        return column;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>

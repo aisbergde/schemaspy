@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Main.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">SchemaSpy</a> &gt; <a href="index.source.html" class="el_package">org.schemaspy</a> &gt; <span class="el_source">Main.java</span></div><h1>Main.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2004 - 2011 John Currier
+ * Copyright (C) 2016 Rafal Kasa
+ * Copyright (C) 2017 Wojciech Kasa
+ * Copyright (C) 2017 Thomas Traude
+ * Copyright (C) 2017 Ismail Simsek
+ * Copyright (C) 2017 Daniel Watt
+ * Copyright (C) 2018 Nils Petzaell
+ *
+ * This file is a part of the SchemaSpy project (http://schemaspy.org).
+ *
+ * SchemaSpy is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * SchemaSpy is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+package org.schemaspy;
+
+import org.schemaspy.cli.SchemaSpyRunner;
+import org.schemaspy.logging.StackTraceOmitter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+
+import java.lang.invoke.MethodHandles;
+
+/**
+ * @author John Currier
+ * @author Rafal Kasa
+ * @author Wojciech Kasa
+ * @author Thomas Traude
+ * @author Ismail Simsek
+ * @author Daniel Watt
+ * @author Nils Petzaell
+ */
+@SpringBootApplication
+<span class="fc" id="L48">public class Main {</span>
+
+<span class="fc" id="L50">    private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());</span>
+
+    public static void main(String... args) {
+<span class="fc" id="L53">        ConfigurableApplicationContext context = SpringApplication.run(Main.class, args);</span>
+<span class="fc" id="L54">        SchemaSpyRunner schemaSpyRunner = context.getBean(SchemaSpyRunner.class);</span>
+<span class="fc" id="L55">        schemaSpyRunner.run(args);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (StackTraceOmitter.hasOmittedStackTrace()) {</span>
+<span class="fc" id="L57">            LOGGER.info(&quot;StackTraces have been omitted, use `-debug` when executing SchemaSpy to see them&quot;);</span>
+        }
+<span class="fc" id="L59">        int exitCode = SpringApplication.exit(context, () -&gt; 0);</span>
+<span class="nc" id="L60">        System.exit(exitCode);</span>
+<span class="nc" id="L61">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.0.201801022044</span></div></body></html>
