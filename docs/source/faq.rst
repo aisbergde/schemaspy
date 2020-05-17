@@ -36,3 +36,32 @@ So install using brew ``brew install graphviz --with-librsvg --with-pango`` |br|
 Depending on OSX version |br|
 *Older than High Sierra*, add ``-renderer :quartz`` to the commandline |br|
 *High Sierra or newer*, add ``-renderer :cairo`` to the commandline |br|
+
+I am using SQL Server an not all Routines (Procedures, Functions) are documented
+~~~~~~~~~
+The used user probably has too few rights. ``VIEW DEFINITION`` rights should be granted::
+
+   --check current rights in the database you want to document
+   USE AdventureWorks2017;
+   GO
+   sp_helprotect;
+
+   --grant VIEW Definition Rights in a specific database
+   USE AdventureWorks2017;
+   GO
+   GRANT VIEW DEFINITION TO User1;
+
+   --OR grant VIEW Definition Rights in all databases
+   USE master;
+   GO
+   GRANT VIEW ANY DEFINITION TO User1;
+
+   --turn off the additional rights to VIEW Definition in all databases
+   USE master;
+   GO
+   REVOKE VIEW ANY DEFINITION TO User1;
+
+   --turn off the additional rights to VIEW Definition i a specific database
+   USE AdventureWorks2017;
+   GO
+   REVOKE VIEW DEFINITION TO User1;
